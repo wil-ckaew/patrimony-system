@@ -1,0 +1,162 @@
+/* Dashboard.module.css */
+.dashboard {
+    padding: 20px;
+  }
+  
+  .dashboardHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+    gap: 15px;
+  }
+  
+  .dashboardHeader h2 {
+    margin: 0;
+    color: #333;
+  }
+  
+  .departmentFilter {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+  
+  .statsGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+  }
+  
+  .statCard {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    text-align: center;
+    border-left: 4px solid #007bff;
+  }
+  
+  .statCardTotal { border-left-color: #007bff; }
+  .statCardActive { border-left-color: #28a745; }
+  .statCardInactive { border-left-color: #dc3545; }
+  .statCardValue { border-left-color: #ffc107; }
+  
+  .statCard h3 {
+    margin: 0 0 10px 0;
+    color: #666;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  .statValue {
+    font-size: 2.5em;
+    font-weight: bold;
+    color: #333;
+    margin: 10px 0;
+  }
+  
+  .statLabel {
+    color: #666;
+    font-size: 12px;
+  }
+  
+  .chartsSection {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 20px;
+  }
+  
+  .chartCard {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  
+  .chartCard h3 {
+    margin: 0 0 20px 0;
+    color: #333;
+    font-size: 16px;
+  }
+  
+  .statusChart,
+  .departmentChart {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .chartItem,
+  .deptItem {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .chartLabel,
+  .deptLabel {
+    min-width: 80px;
+    font-size: 12px;
+    color: #666;
+  }
+  
+  .chartBar,
+  .deptBar {
+    flex: 1;
+    height: 8px;
+    background: #f0f0f0;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  
+  .chartFill,
+  .deptFill {
+    height: 100%;
+    transition: width 0.3s ease;
+  }
+  
+  .chartFillActive { background-color: #28a745; }
+  .chartFillInactive { background-color: #dc3545; }
+  .chartFillMaintenance { background-color: #ffc107; }
+  .chartFillWrittenOff { background-color: #6c757d; }
+  
+  .chartValue,
+  .deptValue {
+    min-width: 30px;
+    text-align: right;
+    font-size: 12px;
+    color: #333;
+    font-weight: bold;
+  }
+  
+  .loading {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+  }
+  
+  .error {
+    text-align: center;
+    padding: 40px;
+    color: #dc3545;
+  }
+  
+  @media (max-width: 768px) {
+    .dashboardHeader {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    
+    .statsGrid {
+      grid-template-columns: 1fr;
+    }
+    
+    .chartsSection {
+      grid-template-columns: 1fr;
+    }
+  }

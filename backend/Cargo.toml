@@ -1,0 +1,22 @@
+[package]
+name = "patrimony-backend"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+actix-web = "4.0"
+actix-cors = "0.6"  # Adicione esta linha
+actix-multipart = "0.6"  # Certifique-se de que está esta versão
+actix-files = "0.6"  # ADICIONE ESTA LINHA
+futures-util = "0.3"     # Adicione esta dependência
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.0", features = ["serde", "v4"] }
+sqlx = { version = "0.7", features = ["postgres", "runtime-tokio-native-tls", "chrono", "bigdecimal", "uuid", "json"] }
+bigdecimal = { version = "0.4", features = ["serde"] }
+dotenv = "0.15"
+futures = "0.3"
+mime = "0.3"
+tokio = { version = "1.0", features = ["full", "time", "fs"] }
+rust_decimal = "1.32"  # Adicione esta linha

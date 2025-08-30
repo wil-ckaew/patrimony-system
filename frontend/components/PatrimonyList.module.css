@@ -1,0 +1,391 @@
+/* PatrimonyList.module.css */
+.patrimonyList {
+  padding: 20px;
+}
+
+.filters {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.filterSelect {
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  min-width: 200px;
+  background: white;
+}
+
+.refreshButton {
+  padding: 10px 20px;
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.refreshButton:hover {
+  background: #45a049;
+  transform: translateY(-1px);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.patrimonyCard {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  transition: all 0.3s ease;
+  border: 1px solid #e0e0e0;
+}
+
+.patrimonyCard:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+.patrimonyCard.expanded {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+.cardHeader {
+  padding: 20px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+  color: #1976d2;
+  position: relative;
+  border-bottom: 2px solid #bbdefb;
+}
+
+.headerMain {
+  flex: 1;
+  margin-right: 15px;
+}
+
+.itemName {
+  margin: 0 0 10px 0;
+  color: #1976d2;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.headerDetails {
+  flex: 1;
+  margin-right: 15px;
+}
+
+.detailLine {
+  margin: 4px 0;
+  font-size: 14px;
+  color: #546e7a;
+}
+
+.expandIndicator {
+  font-size: 16px;
+  font-weight: bold;
+  color: #1976d2;
+  padding: 5px;
+  transition: transform 0.3s ease;
+}
+
+.expandedContent {
+  padding: 20px;
+  background: #fafafa;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.imageSection {
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.patrimonyImage {
+  max-width: 100%;
+  max-height: 300px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  object-fit: cover;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+  border: 2px solid #e3f2fd;
+}
+
+.patrimonyImage:hover {
+  transform: scale(1.02);
+}
+
+.viewImageButton {
+  margin-top: 10px;
+  padding: 8px 16px;
+  background: #2196F3;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.viewImageButton:hover {
+  background: #1976d2;
+  transform: translateY(-1px);
+}
+
+.noImage {
+  text-align: center;
+  padding: 40px;
+  background: #f5f5f5;
+  border-radius: 8px;
+  color: #757575;
+  font-style: italic;
+  border: 2px dashed #bdbdbd;
+}
+
+.detailsGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.detailItem {
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+  font-size: 14px;
+  color: #37474f;
+}
+
+.detailItem:last-child {
+  border-bottom: none;
+}
+
+.descriptionItem {
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.descriptionText {
+  margin: 8px 0 0 0;
+  color: #546e7a;
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 10px;
+  background: white;
+  border-radius: 6px;
+  border-left: 4px solid #2196F3;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  padding-top: 20px;
+  border-top: 1px solid #eee;
+}
+
+.actionButton {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  min-width: 80px;
+}
+
+.actionButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.editButton {
+  background: #2196F3;
+  color: white;
+}
+
+.editButton:hover {
+  background: #1976d2;
+}
+
+.transferButton {
+  background: #4CAF50;
+  color: white;
+}
+
+.transferButton:hover {
+  background: #45a049;
+}
+
+.deleteButton {
+  background: #f44336;
+  color: white;
+}
+
+.deleteButton:hover {
+  background: #d32f2f;
+}
+
+.status {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: inline-block;
+}
+
+.statusActive {
+  background: rgba(76, 175, 80, 0.2);
+  color: #2e7d32;
+  border: 1px solid #4CAF50;
+}
+
+.statusInactive {
+  background: rgba(244, 67, 54, 0.2);
+  color: #c62828;
+  border: 1px solid #f44336;
+}
+
+.statusMaintenance {
+  background: rgba(255, 152, 0, 0.2);
+  color: #ef6c00;
+  border: 1px solid #ff9800;
+}
+
+.statusWrittenOff {
+  background: rgba(96, 125, 139, 0.2);
+  color: #37474f;
+  border: 1px solid #607d8b;
+}
+
+.loading {
+  text-align: center;
+  padding: 60px;
+  color: #666;
+  font-size: 18px;
+}
+
+.error {
+  text-align: center;
+  padding: 40px;
+  color: #d32f2f;
+  background: #ffebee;
+  border: 1px solid #ffcdd2;
+  border-radius: 8px;
+  margin: 20px;
+}
+
+.emptyState {
+  text-align: center;
+  padding: 60px;
+  color: #666;
+  background: #f8f9fa;
+  border-radius: 12px;
+  border: 2px dashed #dee2e6;
+  font-size: 16px;
+}
+
+/* Modal da imagem */
+.imageModal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.imageModalContent {
+  position: relative;
+  max-width: 90%;
+  max-height: 90%;
+}
+
+.imageModalImg {
+  max-width: 100%;
+  max-height: 90vh;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.imageModalClose {
+  position: absolute;
+  top: -40px;
+  right: -40px;
+  background: rgba(255, 255, 255, 0.3);
+  border: none;
+  color: white;
+  font-size: 24px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.imageModalClose:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+  .filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .filterSelect {
+    min-width: unset;
+    width: 100%;
+  }
+  
+  .cardHeader {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .headerMain,
+  .headerDetails {
+    margin-right: 0;
+    width: 100%;
+  }
+  
+  .expandIndicator {
+    align-self: flex-end;
+  }
+  
+  .actions {
+    flex-direction: column;
+  }
+  
+  .actionButton {
+    width: 100%;
+  }
+}

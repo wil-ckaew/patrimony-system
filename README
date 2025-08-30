@@ -1,0 +1,57 @@
+# Criar arquivo README
+echo '# Sistema de Gestão de Patrimônio para Prefeitura
+
+Sistema completo para gestão de bens patrimoniais com backend em Rust, frontend em Next.js e serviço de IA em Python.
+
+## Funcionalidades
+
+- Cadastro de bens patrimoniais com placa única
+- Upload de imagens dos bens
+- Controle de entrada e baixa de patrimônio
+- Transferência entre setores/secretarias
+- Classificação automática de bens usando IA
+- Detecção de danos através de IA
+- Relatórios e estatísticas
+
+## Tecnologias
+
+- **Backend**: Rust + Actix-web + SQLx + PostgreSQL
+- **Frontend**: Next.js + TypeScript + Tailwind CSS
+- **IA**: Python + Flask + TensorFlow
+- **Mobile**: React Native (opcional)
+- **Banco de Dados**: PostgreSQL
+- **Containerização**: Docker + Docker Compose
+
+## Como executar
+
+### Pré-requisitos
+- Docker e Docker Compose instalados
+- 4GB de RAM disponível
+- 10GB de espaço em disco
+
+### Inicialização rápida
+```bash
+./start.sh
+
+
+
+## Comandos Finais para Executar o Sistema
+
+```bash
+# Dar permissão de execução ao script
+chmod +x start.sh
+
+# Iniciar o sistema completo
+./start.sh
+
+# Ou executar manualmente com Docker Compose
+docker-compose up -d --build
+
+# Verificar se todos os serviços estão rodando
+docker-compose ps
+
+# Visualizar logs
+docker-compose logs -f
+
+# Parar o sistema
+docker-compose down
