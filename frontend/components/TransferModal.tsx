@@ -1,15 +1,16 @@
 // components/TransferModal.tsx
-// components/TransferModal.tsx
 import React, { useState } from 'react';
 import { PatrimonyItem, TransferRequest } from '../types/Patrimony';
 import styles from './TransferModal.module.css';
+import { getAuthHeaders, handleAuthError } from '../utils/auth';
 
 interface TransferModalProps {
   item: PatrimonyItem;
   onClose: () => void;
+  onTransferSuccess?: () => void;
 }
 
-export default function TransferModal({ item, onClose }: TransferModalProps) {
+export default function TransferModal({ item, onClose, onTransferSuccess }: TransferModalProps) {
   const [formData, setFormData] = useState({
     toDepartment: '',
     reason: ''
@@ -42,27 +43,40 @@ export default function TransferModal({ item, onClose }: TransferModalProps) {
     setLoading(true);
 
     try {
-      const transferRequest: TransferRequest = {
-        patrimonyId: item.id,
-        fromDepartment: item.department,
-        toDepartment: formData.toDepartment,
+      const transferRequest = {
+        patrimony_id: item.id,
+        to_department: formData.toDepartment,
         reason: formData.reason
       };
 
+      // ✅ CORREÇÃO: Usar getAuthHeaders() em vez de headers manuais
       const response = await fetch('http://localhost:8080/api/transfer', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(transferRequest),
       });
+
+      // ✅ CORREÇÃO: Usar handleAuthError() para tratamento consistente
+      if (handleAuthError(response)) return;
 
       if (response.ok) {
         alert('Transferência realizada com sucesso!');
         onClose();
+        if (onTransferSuccess) {
+          onTransferSuccess();
+        }
       } else {
-        const errorData = await response.json();
-        alert(`Erro na transferência: ${errorData.error || 'Erro desconhecido'}`);
+        const errorText = await response.text();
+        let errorMessage = 'Erro desconhecido';
+        
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.error || errorData.message || errorText;
+        } catch {
+          errorMessage = errorText || 'Erro na transferência';
+        }
+        
+        alert(`Erro na transferência: ${errorMessage}`);
       }
     } catch (error) {
       console.error('Error transferring patrimony:', error);
@@ -112,6 +126,7 @@ export default function TransferModal({ item, onClose }: TransferModalProps) {
               value={formData.toDepartment}
               onChange={handleInputChange}
               required
+              disabled={loading}
             >
               <option value="">Selecione o departamento</option>
               {departments
@@ -135,14 +150,24 @@ export default function TransferModal({ item, onClose }: TransferModalProps) {
               rows={4}
               placeholder="Descreva o motivo da transferência..."
               required
+              disabled={loading}
             />
           </div>
 
           <div className={styles.formActions}>
-            <button type="button" onClick={onClose} disabled={loading}>
+            <button 
+              type="button" 
+              onClick={onClose} 
+              disabled={loading}
+              className={styles.cancelButton}
+            >
               Cancelar
             </button>
-            <button type="submit" disabled={loading}>
+            <button 
+              type="submit" 
+              disabled={loading}
+              className={styles.submitButton}
+            >
               {loading ? 'Processando...' : 'Confirmar Transferência'}
             </button>
           </div>

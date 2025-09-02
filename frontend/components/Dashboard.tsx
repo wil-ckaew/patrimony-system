@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Stats, DepartmentStats } from '../types/Patrimony';
 import styles from './Dashboard.module.css';
+import { getAuthHeaders, handleAuthError } from '../utils/auth';
 
 export default function Dashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
@@ -37,21 +38,29 @@ export default function Dashboard() {
           ? 'http://localhost:8080/api/stats'
           : `http://localhost:8080/api/stats?department=${selectedDepartment}`;
 
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      // ✅ CORREÇÃO: Usar getAuthHeaders() em vez de headers manuais
+      const response = await fetch(url, { 
+        headers: getAuthHeaders() 
+      });
+
+      // ✅ CORREÇÃO: Usar handleAuthError() para tratamento consistente
+      if (handleAuthError(response)) return;
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
       const data = await response.json();
       console.log('📊 Stats data:', data);
 
-      // normalização de dados para evitar undefined
       setStats({
         total: data.total || 0,
         active: data.active || 0,
         inactive: data.inactive || 0,
         maintenance: data.maintenance || 0,
-        written_off: data.written_off || 0,
-        totalValue: Number(data.totalValue) || 0,
-        byDepartment: data.byDepartment || [],
+        writtenOff: data.written_off || 0,
+        totalValue: Number(data.total_value) || 0,
+        byDepartment: data.by_department || [],
       });
     } catch (error) {
       console.error('Erro ao buscar estatísticas:', error);
@@ -103,7 +112,7 @@ export default function Dashboard() {
         <div className={`${styles.statCard} ${styles.statCardValue}`}>
           <h3>Valor Total</h3>
           <div className={styles.statValue}>
-            R$ {Number(stats.totalValue || 0).toFixed(2)}
+            R$ {Number(stats.totalValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </div>
           <div className={styles.statLabel}>Valor patrimonial</div>
         </div>
@@ -119,10 +128,12 @@ export default function Dashboard() {
         <div className={styles.chartCard}>
           <h3>Status dos Bens</h3>
           <div className={styles.statusChart}>
-            {['Ativos', 'Inativos', 'Manutenção', 'Baixados'].map((label, i) => {
-              const keys = ['active', 'inactive', 'maintenance', 'written_off'] as const;
-              const key = keys[i];
-              const value = stats[key];
+            {[
+              { label: 'Ativos', key: 'active' as const, value: stats.active },
+              { label: 'Inativos', key: 'inactive' as const, value: stats.inactive },
+              { label: 'Manutenção', key: 'maintenance' as const, value: stats.maintenance },
+              { label: 'Baixados', key: 'writtenOff' as const, value: stats.writtenOff }
+            ].map(({ label, key, value }) => {
               const percent = stats.total ? (value / stats.total) * 100 : 0;
               const barClass =
                 key === 'active'

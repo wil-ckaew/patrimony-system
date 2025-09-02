@@ -20,3 +20,5 @@ futures = "0.3"
 mime = "0.3"
 tokio = { version = "1.0", features = ["full", "time", "fs"] }
 rust_decimal = "1.32"  # Adicione esta linha
+jsonwebtoken = "9.3.1"
+bcrypt = "0.17.1"

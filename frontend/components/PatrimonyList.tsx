@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { PatrimonyItem } from '../types/Patrimony';
 import styles from './PatrimonyList.module.css';
+import { getAuthHeaders, handleAuthError } from '../utils/auth';
 
 interface PatrimonyListProps {
   onEdit: (item: PatrimonyItem) => void;
@@ -61,20 +62,37 @@ export default function PatrimonyList({ onEdit, onTransfer, refreshTrigger }: Pa
     try {
       setLoading(true);
       setError('');
-
+  
+      // ✅ Move o import para o topo do arquivo, fora da função
+      // import { getAuthHeaders, handleAuthError } from '../utils/auth';
+  
       const params = new URLSearchParams();
       if (filter.department) params.append('department', filter.department);
       if (filter.status) params.append('status', filter.status);
-
+  
       const url = `http://localhost:8080/api/patrimony${params.toString() ? `?${params.toString()}` : ''}`;
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+      
+      console.log('🔍 Fetching patrimonies from:', url);
+      
+      // ✅ Use getAuthHeaders() e renomeie a variável para evitar conflito
+      const fetchResponse = await fetch(url, {
+        headers: getAuthHeaders()
+      });
+  
+      console.log('📥 Response status:', fetchResponse.status);
+  
+      // ✅ Use handleAuthError() para tratamento consistente
+      if (handleAuthError(fetchResponse)) return;
+  
+      if (!fetchResponse.ok) {
+        const errorText = await fetchResponse.text();
+        console.error('❌ Server error:', errorText);
+        throw new Error(`Erro do servidor: ${fetchResponse.status} - ${errorText}`);
       }
-
-      const data = await response.json();
+  
+      const data = await fetchResponse.json();
+      console.log('✅ Data received:', data.length, 'items');
+      
       const mappedData = data.map((item: any) => ({
         id: item.id,
         plate: item.plate,
@@ -84,11 +102,17 @@ export default function PatrimonyList({ onEdit, onTransfer, refreshTrigger }: Pa
         value: item.value || 0,
         department: item.department,
         status: item.status,
-        imageUrl: item.image_url, // Certifique-se que é o nome do arquivo
+        invoiceNumber: item.invoice_number || undefined,
+        commitmentNumber: item.commitment_number || undefined,
+        denfSeNumber: item.denf_se_number || undefined,
+        invoiceFile: item.invoice_file || undefined,
+        commitmentFile: item.commitment_file || undefined,
+        denfSeFile: item.denf_se_file || undefined,
+        imageUrl: item.image_url || undefined,
         createdAt: item.created_at,
         updatedAt: item.updated_at
       })) as PatrimonyItem[];
-
+  
       setPatrimonies(mappedData);
     } catch (error) {
       console.error('Error fetching patrimonies:', error);
@@ -97,29 +121,41 @@ export default function PatrimonyList({ onEdit, onTransfer, refreshTrigger }: Pa
       setLoading(false);
     }
   };
-
+  
   const handleDelete = async (id: string) => {
     if (!confirm('Tem certeza que deseja excluir este bem?')) return;
-
+  
     try {
-      const response = await fetch(`http://localhost:8080/api/patrimony/${id}`, {
+      // ✅ Use getAuthHeaders() e renomeie a variável
+      const deleteResponse = await fetch(`http://localhost:8080/api/patrimony/${id}`, {
         method: 'DELETE',
+        headers: getAuthHeaders()
       });
-
-      if (response.ok) {
+  
+      if (deleteResponse.ok) {
         fetchPatrimonies();
+      } else if (handleAuthError(deleteResponse)) {
+        return;
       } else {
-        alert('Erro ao excluir o bem');
+        const errorText = await deleteResponse.text();
+        alert(`Erro ao excluir o bem: ${errorText}`);
       }
     } catch (error) {
       console.error('Error deleting patrimony:', error);
       alert('Erro ao excluir o bem');
     }
   };
-
+  
   const handleImageClick = (imageUrl: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setSelectedImage(imageUrl);
+  };
+  
+  const handleDocumentClick = (documentUrl: string | undefined, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (documentUrl) {
+      window.open(`http://localhost:8080${documentUrl}`, '_blank');
+    }
   };
 
   const closeImageModal = () => {
@@ -185,10 +221,6 @@ export default function PatrimonyList({ onEdit, onTransfer, refreshTrigger }: Pa
         ) : (
           patrimonies.map(item => {
             const isExpanded = expandedItems.has(item.id);
-            //const imageFullUrl = item.imageUrl ? `http://localhost:8080/uploads/${item.imageUrl}` : null;
-            // Corrija a construção da URL da imagem
-           // const imageFullUrl = item.imageUrl ? `http://localhost:8080${item.imageUrl}` : null;
-            // PatrimonyList.tsx - CORRIJA ESTA LINHA:
             const imageFullUrl = item.imageUrl ? `http://localhost:8080${item.imageUrl.startsWith('/') ? '' : '/'}${item.imageUrl}` : null;
 
             return (
@@ -221,6 +253,52 @@ export default function PatrimonyList({ onEdit, onTransfer, refreshTrigger }: Pa
                     <div className={styles.detailsGrid}>
                       <div className={styles.detailItem}><strong>Valor:</strong> R$ {item.value.toFixed(2)}</div>
                       <div className={styles.detailItem}><strong>Data de aquisição:</strong> {new Date(item.acquisitionDate).toLocaleDateString('pt-BR')}</div>
+                      
+                      {item.invoiceNumber && (
+                        <div className={styles.detailItem}>
+                          <strong>Nº NF:</strong> {item.invoiceNumber}
+                          {item.invoiceFile && (
+                            <button 
+                              className={styles.documentButton}
+                              onClick={(e) => handleDocumentClick(item.invoiceFile, e)}
+                              title="Visualizar Nota Fiscal"
+                            >
+                              📄 Ver NF
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {item.commitmentNumber && (
+                        <div className={styles.detailItem}>
+                          <strong>Nº Empenho:</strong> {item.commitmentNumber}
+                          {item.commitmentFile && (
+                            <button 
+                              className={styles.documentButton}
+                              onClick={(e) => handleDocumentClick(item.commitmentFile, e)}
+                              title="Visualizar Empenho"
+                            >
+                              📄 Ver Empenho
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {item.denfSeNumber && (
+                        <div className={styles.detailItem}>
+                          <strong>Nº DENF/SE:</strong> {item.denfSeNumber}
+                          {item.denfSeFile && (
+                            <button 
+                              className={styles.documentButton}
+                              onClick={(e) => handleDocumentClick(item.denfSeFile, e)}
+                              title="Visualizar DENF/SE"
+                            >
+                              📄 Ver DENF/SE
+                            </button>
+                          )}
+                        </div>
+                      )}
+
                       {item.description && (
                         <div className={styles.descriptionItem}>
                           <strong>Descrição:</strong>

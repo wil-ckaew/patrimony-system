@@ -110,45 +110,26 @@ export default function PatrimonyForm({ item, onClose, onRefresh }: PatrimonyFor
         return;
       }
   
-      // ✅ Formatar data corretamente (YYYY-MM-DD)
+      // ✅ CORREÇÃO: Converter a string de data para o formato YYYY-MM-DD
       const acquisitionDate = formData.acquisition_date ? 
         new Date(formData.acquisition_date).toISOString().split('T')[0] : 
         new Date().toISOString().split('T')[0];
   
-      // ✅ CORREÇÃO CRÍTICA: Converter value para número (f64)
-      let numericValue: number;
-      
-      if (formData.value.trim() === '') {
-        numericValue = 0.0; // ✅ Valor padrão como float
-      } else {
-        // Converter para número, tratando formato brasileiro
-        const cleanedValue = formData.value
-          .replace(',', '.') // Substitui vírgula por ponto
-          .replace(/[^\d.]/g, ''); // Remove caracteres não numéricos
-        
-        numericValue = parseFloat(cleanedValue);
-        
-        if (isNaN(numericValue)) {
-          alert('❌ Valor deve ser um número válido');
-          setLoading(false);
-          return;
-        }
+      // ✅ CORREÇÃO CRÍTICA: Converter value para número como na versão anterior
+      const numericValue = parseFloat(formData.value.replace(',', '.')); // Suporte para vírgula decimal
+      if (isNaN(numericValue) || numericValue <= 0) {
+        alert('❌ Valor deve ser um número positivo maior que zero');
+        setLoading(false);
+        return;
       }
   
-      // 🔍 DEBUG DETALHADO
-      console.log('🐛 DEBUG VALOR:');
-      console.log('  Valor original:', formData.value);
-      console.log('  Valor convertido:', numericValue);
-      console.log('  Tipo do valor convertido:', typeof numericValue);
-      console.log('  É número?', !isNaN(numericValue));
-  
-      // ✅ Dados para enviar ao backend (AGORA COM NÚMERO)
+      // ✅ CORREÇÃO: Usar número, não string (como na versão anterior)
       const patrimonyData = {
         plate: formData.plate.trim(),
         name: formData.name.trim(),
         description: formData.description.trim(),
         acquisition_date: acquisitionDate,
-        value: numericValue, // ✅ NUMBER (f64 no backend)
+        value: numericValue, // ✅ Número (como na versão anterior)
         department: formData.department,
         status: formData.status,
         invoice_number: formData.invoice_number.trim() || "",
@@ -156,9 +137,10 @@ export default function PatrimonyForm({ item, onClose, onRefresh }: PatrimonyFor
         denf_se_number: formData.denf_se_number.trim() || ""
       };
   
-      console.log('📤 Dados enviados ao backend:', patrimonyData);
+      console.log('📤 Enviando dados para o backend:', patrimonyData);
+      console.log('🔢 Tipo do value:', typeof patrimonyData.value);
   
-      // ✅ Validações básicas
+      // ✅ Validações básicas (como na versão anterior)
       if (!patrimonyData.plate) {
         alert('❌ Placa é obrigatória');
         setLoading(false);
@@ -183,7 +165,8 @@ export default function PatrimonyForm({ item, onClose, onRefresh }: PatrimonyFor
       
       const method = item ? 'PUT' : 'POST';
   
-      console.log('🌐 Enviando para:', url, 'Método:', method);
+      console.log('🌐 Enviando requisição para:', url);
+      console.log('📋 Método:', method);
   
       const response = await fetch(url, {
         method,
@@ -201,18 +184,26 @@ export default function PatrimonyForm({ item, onClose, onRefresh }: PatrimonyFor
         return;
       }
   
+      // ✅ Usar handleAuthError para tratamento consistente
+      if (handleAuthError(response)) {
+        setLoading(false);
+        return;
+      }
+  
       let responseData;
       try {
         const responseText = await response.text();
-        console.log('📄 Resposta bruta:', responseText);
+        console.log('📄 Conteúdo bruto da resposta:', responseText);
         
         if (responseText) {
           responseData = JSON.parse(responseText);
           console.log('📊 Resposta parseada:', responseData);
+        } else {
+          console.warn('⚠️ Resposta vazia do servidor');
         }
       } catch (jsonError) {
-        console.error('❌ Erro ao parsear JSON:', jsonError);
-        alert('Erro no servidor. Tente novamente.');
+        console.error('❌ Erro ao parsear resposta JSON:', jsonError);
+        alert('Erro inesperado no servidor. Verifique os logs.');
         setLoading(false);
         return;
       }
@@ -221,9 +212,9 @@ export default function PatrimonyForm({ item, onClose, onRefresh }: PatrimonyFor
         console.log('✅ Bem salvo com sucesso!');
         
         if (image) {
-          const patrimonyId = responseData.id || item?.id;
+          const patrimonyId = responseData?.id || item?.id;
           if (patrimonyId) {
-            console.log('📤 Enviando imagem...');
+            console.log('📤 Enviando imagem para o patrimônio:', patrimonyId);
             const imageUploadSuccess = await uploadImageToServer(patrimonyId, image);
             if (!imageUploadSuccess) {
               alert('⚠️ Bem salvo, mas houve erro no upload da imagem.');
@@ -231,25 +222,47 @@ export default function PatrimonyForm({ item, onClose, onRefresh }: PatrimonyFor
           }
         }
         
+        // ✅ Feedback visual para o usuário
         alert('✅ Bem patrimonial salvo com sucesso!');
         onRefresh();
         onClose();
       } else {
         console.error('❌ Erro na resposta:', response.status, responseData);
         
-        let errorMessage = responseData?.error || responseData?.message || `Erro ${response.status}`;
+        let errorMessage = `Erro ${response.status}: ${response.statusText}`;
         
-        if (errorMessage.includes('duplicate')) {
+        if (responseData) {
+          if (responseData.message) {
+            errorMessage = responseData.message;
+          } else if (responseData.error) {
+            errorMessage = responseData.error;
+          } else if (typeof responseData === 'string') {
+            errorMessage = responseData;
+          } else if (responseData.details) {
+            errorMessage = responseData.details;
+          }
+        }
+        
+        // ✅ Mensagens de erro mais amigáveis
+        if (errorMessage.includes('duplicate key') || errorMessage.includes('já existe')) {
           errorMessage = '❌ Já existe um bem com esta placa. Use uma placa única.';
-        } else if (errorMessage.includes('value') || errorMessage.includes('valor')) {
-          errorMessage = '❌ Problema com o valor informado. Use números.';
+        } else if (errorMessage.includes('null value') || errorMessage.includes('nulo')) {
+          errorMessage = '❌ Campos obrigatórios não preenchidos corretamente.';
+        } else if (errorMessage.includes('invalid input') || errorMessage.includes('inválido')) {
+          errorMessage = '❌ Dados em formato inválido. Verifique os valores informados.';
         }
         
         alert(`Erro ao salvar o bem: ${errorMessage}`);
       }
     } catch (error) {
       console.error('❌ Erro de conexão:', error);
-      alert('Erro de conexão. Verifique se o servidor está rodando.');
+      
+      // ✅ Mensagens de erro mais específicas
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        alert('❌ Não foi possível conectar ao servidor. Verifique se o backend está rodando.');
+      } else {
+        alert('❌ Erro inesperado ao salvar o bem. Tente novamente.');
+      }
     } finally {
       setLoading(false);
     }

@@ -6,6 +6,10 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# Variáveis para corrigir problemas de rede do Cargo
+ENV CARGO_HTTP_MULTIPLEXING=false
+ENV CARGO_HTTP_TIMEOUT=600    
+
 WORKDIR /app
 COPY . .
 RUN cargo build --release
