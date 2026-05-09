@@ -1,0 +1,192 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1.5rem;
+}
+
+.modal {
+  width: min(100%, 760px);
+  background: white;
+  border-radius: 28px;
+  box-shadow: 0 40px 110px rgba(15, 23, 42, 0.14);
+  overflow: hidden;
+  max-height: 90vh;  /* Adicione esta linha */
+  overflow-y: auto;  /* Adicione esta linha */
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem 0;  /* Reduza de 1.75rem */
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.closeButton {
+  border: none;
+  background: transparent;
+  font-size: 1.75rem;
+  line-height: 1;
+  cursor: pointer;
+  color: #334155;
+}
+
+.form {
+  display: grid;
+  gap: 0.875rem;  /* Reduza de 1rem */
+  padding: 1.5rem;  /* Reduza de 1.75rem */
+}
+
+.fieldGroup {
+  display: grid;
+  gap: 0.35rem;  /* Reduza de 0.5rem */
+}
+
+.fieldGroup label {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.searchHelper {
+  color: #64748b;
+  font-size: 0.88rem;
+}
+
+.vehicleOptions {
+  display: grid;
+  gap: 0.5rem;
+  max-height: 180px;  /* Reduza de 220px para 180px */
+  overflow-y: auto;
+  padding: 0.5rem 0;
+}
+
+.emptyOption {
+  padding: 0.95rem 1rem;
+  border-radius: 18px;
+  background: #f8fafc;
+  color: #475569;
+}
+
+.vehicleOption {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;  /* Reduza um pouco o padding */
+  border-radius: 18px;
+  border: 1px solid #cbd5e1;
+  background: white;
+  color: #0f172a;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  text-align: left;  /* Adicione esta linha */
+}
+
+.vehicleOption:hover,
+.vehicleOptionActive {
+  border-color: #4338ca;
+  box-shadow: 0 10px 30px rgba(67, 56, 202, 0.08);
+}
+
+.vehicleOption strong {
+  font-weight: 700;
+}
+
+.vehicleOption span {
+  color: #64748b;
+  font-size: 0.92rem;
+}
+
+.fieldGroup input,
+.fieldGroup select,
+.fieldGroup textarea {
+  width: 100%;
+  border-radius: 18px;
+  border: 1px solid #cbd5e1;
+  padding: 0.75rem 1rem;  /* Reduza de 0.95rem */
+  font-size: 0.95rem;
+  color: #0f172a;
+  background: #f8fafc;
+}
+
+.fieldGroup textarea {
+  resize: vertical;
+  min-height: 112px;
+}
+
+.sidecar {
+  display: grid;
+  gap: 1rem;
+  padding: 0.875rem;  /* Reduza de 1rem */
+  border-radius: 20px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.metaList {
+  display: grid;
+  gap: 0.45rem;
+  color: #475569;
+  font-size: 0.95rem;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+  margin-top: 0.25rem;  /* Reduza de 0.5rem */
+}
+
+.buttonPrimary,
+.buttonSecondary {
+  border: none;
+  padding: 0.75rem 1.2rem;  /* Reduza de 0.95rem 1.4rem */
+  border-radius: 999px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.buttonPrimary {
+  background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+  color: white;
+}
+
+.buttonSecondary {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.errorText {
+  color: #b91c1c;
+  background: #fee2e2;
+  border-radius: 18px;
+  padding: 0.95rem 1rem;
+}
+
+@media (max-width: 680px) {
+  .modal {
+    width: 100%;
+    max-width: 100%;
+  }
+}

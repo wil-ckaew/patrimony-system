@@ -1,0 +1,6 @@
+NAMES                           STATUS                      IMAGE
+patrimony-system-frontend-1     Up 11 minutes               patrimony-system-frontend
+patrimony-system-ai-service-1   Exited (1) 10 minutes ago   patrimony-system-ai-service
+patrimony-system-backend-1      Exited (1) 10 minutes ago   patrimony-system-backend
+patrimony-system-backup-1       Up 3 months                 postgres:13
+patrimony-system-db-1           Up 2 hours (healthy)        postgres:13

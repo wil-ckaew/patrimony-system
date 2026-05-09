@@ -1,0 +1,9 @@
+Connecting to database: postgres://postgres:password@127.0.0.1:5433/patrimony
+Failed to connect to database (10 retries left): error communicating with database: failed to lookup address information: Temporary failure in name resolution
+Failed to connect to database (9 retries left): error communicating with database: failed to lookup address information: Temporary failure in name resolution
+Failed to connect to database (8 retries left): error communicating with database: failed to lookup address information: Temporary failure in name resolution
+Failed to connect to database (7 retries left): error communicating with database: failed to lookup address information: Temporary failure in name resolution
+Failed to connect to database (6 retries left): error communicating with database: failed to lookup address information: Temporary failure in name resolution
+Failed to connect to database (5 retries left): error communicating with database: failed to lookup address information: Temporary failure in name resolution
+Failed to connect to database (4 retries left): error communicating with database: failed to lookup address information: Temporary failure in name resolution
+Failed to connect to database (3 retries left): error communicating with database: failed to lookup address information: Temporary failure in name resolution

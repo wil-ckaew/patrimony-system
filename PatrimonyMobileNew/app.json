@@ -1,0 +1,79 @@
+{
+  "expo": {
+    "name": "Sistema Patrimônio",
+    "slug": "patrimony-system",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.suacompany.patrimony",
+      "infoPlist": {
+        "NSCameraUsageDescription": "O app precisa acessar a câmera para tirar fotos dos bens patrimoniais",
+        "NSPhotoLibraryUsageDescription": "O app precisa acessar a galeria para selecionar fotos dos bens",
+        "NSPhotoLibraryAddUsageDescription": "O app precisa salvar fotos na galeria para armazenar imagens dos bens",
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true,
+          "NSExceptionDomains": {
+            "localhost": {
+              "NSExceptionAllowsInsecureHTTPLoads": true,
+              "NSIncludesSubdomains": true
+            }
+          }
+        }
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.suacompany.patrimony",
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ],
+      "usesCleartextTraffic": true
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "O app precisa acessar suas fotos para selecionar imagens dos bens patrimoniais.",
+          "cameraPermission": "O app precisa acessar a câmera para tirar fotos dos bens patrimoniais."
+        }
+      ]
+    ],
+    "scheme": "patrimony",
+    "extra": {
+      "eas": {
+        "projectId": "48c10958-ae1b-4a3b-84fb-562e99dcde03"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/48c10958-ae1b-4a3b-84fb-562e99dcde03"
+    },
+    "androidStatusBar": {
+      "backgroundColor": "#ffffff",
+      "barStyle": "dark-content"
+    },
+    "iosStatusBar": {
+      "backgroundColor": "#ffffff",
+      "barStyle": "dark-content"
+    }
+  }
+}

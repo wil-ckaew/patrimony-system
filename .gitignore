@@ -1,0 +1,31 @@
+# Node
+node_modules/
+frontend/node_modules/
+
+# Next.js
+.next/
+out/
+
+# Rust
+target/
+
+# Build
+dist/
+build/
+
+# Env
+.env
+.env.local
+
+# Logs
+*.log
+
+# TypeScript
+*.tsbuildinfo
+
+# Uploads
+uploads/
+
+# OS
+.DS_Store
+Thumbs.db

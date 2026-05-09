@@ -1,0 +1,195 @@
+# Criar arquivo README
+echo '# Sistema de Gestão de Patrimônio para Prefeitura
+
+Sistema completo para gestão de bens patrimoniais com backend em Rust, frontend em Next.js e serviço de IA em Python.
+
+## Funcionalidades
+
+- Cadastro de bens patrimoniais com placa única
+- Upload de imagens dos bens
+- Controle de entrada e baixa de patrimônio
+- Transferência entre setores/secretarias
+- Classificação automática de bens usando IA
+- Detecção de danos através de IA
+- Relatórios e estatísticas
+
+## Tecnologias
+
+- **Backend**: Rust + Actix-web + SQLx + PostgreSQL
+- **Frontend**: Next.js + TypeScript + Tailwind CSS
+- **IA**: Python + Flask + TensorFlow
+- **Mobile**: React Native (opcional)
+- **Banco de Dados**: PostgreSQL
+- **Containerização**: Docker + Docker Compose
+
+## Como executar
+
+### Pré-requisitos
+- Docker e Docker Compose instalados
+- 4GB de RAM disponível
+- 10GB de espaço em disco
+
+### Inicialização rápida
+```bash
+./start.sh
+
+
+
+## Comandos Finais para Executar o Sistema
+
+```bash
+# Dar permissão de execução ao script
+chmod +x start.sh
+
+# Iniciar o sistema completo
+./start.sh
+
+# Ou executar manualmente com Docker Compose
+docker-compose up -d --build
+
+# Verificar se todos os serviços estão rodando
+docker-compose ps
+
+# Visualizar logs
+docker-compose logs -f
+
+# Parar o sistema
+docker-compose down
+
+Manual completo com o mobile junto 
+Patrimony System - Guia de Execução
+Pré-requisitos
+
+    Docker e Docker Compose instalados
+
+    Node.js (apenas para desenvolvimento mobile)
+
+    Acesso ao terminal/linha de comando
+
+Comandos de Execução
+1. Reiniciar o ambiente Docker completo
+bash
+
+cd patrimony-system
+docker-compose down -v
+docker system prune -a --volumes
+./start.sh
+
+2. Restaurar backup do banco de dados
+bash
+
+./restore-backup.sh
+
+3. Executar aplicativo mobile
+bash
+
+cd PatrimonyMobileNew
+npx expo start --clear
+
+Estrutura do Projeto
+text
+
+patrimony-system/
+├── backend/           (Container Docker)
+├── frontend/          (Container Docker)
+├── PatrimonyMobileNew/ (Executado localmente com Expo)
+├── start.sh          (Script de inicialização)
+└── restore-backup.sh (Script de restore)
+
+Observações Importantes
+
+    O backend e frontend rodam em containers Docker
+
+    O aplicativo mobile (PatrimonyMobileNew) deve ser executado localmente com Expo
+
+    O aplicativo mobile se conecta ao backend através do endereço configurado
+
+    Use --clear no Expo para limpar o cache quando houver problemas
+
+Solução de Problemas
+
+    Se o aplicativo não conectar com o backend, verifique:
+
+        O IP do backend no arquivo de configuração
+
+        Se o backend está rodando corretamente
+
+        As permissões de rede no ambiente de desenvolvimento
+
+
+backup e restore e git 
+1. Antes de atualizar o sistema
+
+Faz o backup (com data e link latest):
+
+./backup.sh
+
+Isso vai gerar algo como:
+
+backups/backup-2025-09-05.sql
+backups/backup-latest.sql   (aponta para o de hoje)
+
+2. Atualiza seu código
+
+docker-compose down
+git pull   # ou copia os arquivos novos do backend/frontend
+docker-compose up --build -d
+
+3. Restaura os dados que você tinha digitado
+
+Assim que os containers subirem de novo, roda:
+
+./restore-backup.sh
+
+Esse script faz:
+
+Dropar o banco patrimony antigo.
+
+Criar o banco do zero.
+
+Carregar os dados do backups/backup-latest.sql.
+
+Ou, se quiser voltar para um backup específico de outro dia:
+
+./restore.sh backups/backup-2025-09-05.sql
+
+✅ Resultado:
+
+Seu sistema atualizado (novo código rodando).
+
+Banco restaurado com os dados que você já tinha digitado antes.
+
+
+#Error no celular depois que começa em outra maquina 
+#instalar 
+
+npm install 
+
+# Update @types/react to the expected version
+npm install @types/react@~19.1.10 --save-dev
+
+# Update typescript to the expected version
+npm install typescript@~5.9.2 --save-dev
+
+1. Corrigir o Erro "Interactive prompt was cancelled" (Prompt Interativo Cancelado)
+
+O problema imediato no terminal é que o Expo está te perguntando algo e, como você não selecionou uma opção, ele está travando e cancelando a operação.
+
+No seu último log, o terminal parou aqui:
+
+? 
+It is recommended to log in with your Expo account before proceeding. 
+Learn more
+ › - Use arrow-keys. Return to submit.
+❯ 	Log in
+	Proceed anonymously
+
+O erro CommandError: Interactive prompt was cancelled acontece porque você precisa selecionar uma opção e pressionar Enter (mesmo que você queira proceder anonimamente).
+
+Ação Necessária
+
+    Use a seta para baixo (↓) para mover o cursor ❯ e destacar Proceed anonymously.
+
+    Pressione a tecla Enter (ou Return).
+
+Isso fará com que o servidor do Expo prossiga e fique aguardando você abrir o aplicativo no seu celular ou simulador.

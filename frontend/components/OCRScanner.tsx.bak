@@ -1,0 +1,451 @@
+// components/OCRScanner.tsx (versão melhorada para NF e Empenho)
+import React, { useState, useRef } from 'react';
+import Tesseract from 'tesseract.js';
+import * as pdfjsLib from 'pdfjs-dist';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+
+interface OCRScannerProps {
+  onDataExtracted: (data: {
+    invoiceNumber?: string;
+    supplier?: string;
+    value?: number;
+    issueDate?: string;
+    commitmentNumber?: string;
+  }) => void;
+  onClose: () => void;
+}
+
+const OCRScanner: React.FC<OCRScannerProps> = ({ onDataExtracted, onClose }) => {
+  const [image, setImage] = useState<string | null>(null);
+  const [processing, setProcessing] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [fileName, setFileName] = useState<string>('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const extractTextFromPDF = async (file: File): Promise<string> => {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    let fullText = '';
+    
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items.map((item: any) => item.str).join(' ');
+      fullText += pageText + '\n';
+      setProgress(Math.floor((i / pdf.numPages) * 100));
+    }
+    
+    return fullText;
+  };
+
+  const extractTextFromImage = async (file: File): Promise<string> => {
+    const { data } = await Tesseract.recognize(file, 'por', {
+      logger: (m) => {
+        if (m.status === 'recognizing text') {
+          setProgress(Math.floor(m.progress * 100));
+        }
+      },
+    });
+    return data.text;
+  };
+
+  const parseDocumentText = (text: string, fileName: string) => {
+    const result: any = {};
+    const upperText = text.toUpperCase();
+    const lowerText = text.toLowerCase();
+    
+    console.log('📄 Analisando documento:', fileName);
+    console.log('📄 Texto extraído (primeiros 500 chars):', text.substring(0, 500));
+
+    // Verificar se é um documento de EMPENHO
+    const isEmpenho = upperText.includes('EMPENHO') || 
+                      upperText.includes('NOTA DE EMPENHO') ||
+                      fileName.toLowerCase().includes('empenho');
+
+    // Verificar se é uma NOTA FISCAL
+    const isNotaFiscal = upperText.includes('NOTA FISCAL') || 
+                         upperText.includes('NF') ||
+                         upperText.includes('NFS') ||
+                         fileName.toLowerCase().includes('nf') ||
+                         fileName.toLowerCase().includes('nota');
+
+    console.log('📄 Tipo detectado:', isEmpenho ? 'EMPENHO' : (isNotaFiscal ? 'NOTA FISCAL' : 'GERAL'));
+
+    // 1. Buscar Número da NF (apenas se for nota fiscal)
+    if (isNotaFiscal || !isEmpenho) {
+      const invoicePatterns = [
+        /N[º°]\s*(\d{3,9})/i,
+        /NOTA FISCAL\s*N[º°]\s*(\d{3,9})/i,
+        /NF\s*[º°]\s*(\d{3,9})/i,
+        /Número\s+da\s+NF\s*:?\s*(\d{3,9})/i,
+        /DOCUMENTO\s*:?\s*(\d{3,9})/i,
+        /(\d{6,9})/
+      ];
+      
+      for (const pattern of invoicePatterns) {
+        const match = text.match(pattern);
+        if (match) {
+          const num = match[1] || match[0];
+          if (num && num.length >= 4 && num !== '0000') {
+            result.invoiceNumber = num.trim();
+            console.log('✅ NF encontrada:', result.invoiceNumber);
+            break;
+          }
+        }
+      }
+    }
+
+    // 2. Buscar Número do Empenho (prioridade para documentos de empenho)
+    if (isEmpenho || !isNotaFiscal) {
+      const commitmentPatterns = [
+        /EMPENHO\s*:?\s*(\d{3,9})/i,
+        /NOTA DE EMPENHO\s*:?\s*(\d{3,9})/i,
+        /N[º°]\s+EMPENHO\s*:?\s*(\d{3,9})/i,
+        /N[Úú]mero\s+do\s+EMPENHO\s*:?\s*(\d{3,9})/i,
+        /EMPENHO\s+N[º°]\s*(\d{3,9})/i,
+        /(\d{4,9})/
+      ];
+      
+      for (const pattern of commitmentPatterns) {
+        const match = text.match(pattern);
+        if (match) {
+          const num = match[1] || match[0];
+          if (num && num.length >= 4 && num !== '0000') {
+            result.commitmentNumber = num.trim();
+            console.log('✅ Empenho encontrado:', result.commitmentNumber);
+            break;
+          }
+        }
+      }
+    }
+
+    // 3. Buscar Fornecedor (para ambos os tipos)
+    const lines = text.split('\n');
+    const ignoreWords = ['nota', 'fiscal', 'data', 'valor', 'total', 'nº', 'numero', 'emissão', 
+                         'cnpj', 'ie', 'inscrição', 'página', 'sistema', 'impressão', 'documento',
+                         'danfe', 'chave', 'acesso', 'consulta', 'protocolo', 'autenticação',
+                         'secretaria', 'fazenda', 'estado', 'município', 'prefeitura', 'brasil',
+                         'endereço', 'telefone', 'email', 'site', 'www', 'http', 'empenho',
+                         'prefeitura', 'municipal', 'governo', 'estado'];
+    
+    for (const line of lines) {
+      const cleanLine = line.trim();
+      if (cleanLine.length < 5 || cleanLine.length > 60) continue;
+      
+      const hasLetters = /[A-Za-zÀ-ÖØ-öø-ÿ]/.test(cleanLine);
+      const hasIgnoreWord = ignoreWords.some(word => cleanLine.toLowerCase().includes(word));
+      const isAllCaps = cleanLine === cleanLine.toUpperCase() && cleanLine.length > 5;
+      
+      if (hasLetters && !hasIgnoreWord && (isAllCaps || cleanLine.length > 8)) {
+        let supplier = cleanLine.replace(/[^\w\sÀ-ÖØ-öø-ÿ&.,-]/g, '');
+        supplier = supplier.substring(0, 60).trim();
+        
+        if (supplier.length > 5 && !supplier.match(/^\d+$/)) {
+          result.supplier = supplier;
+          console.log('✅ Fornecedor encontrado:', supplier);
+          break;
+        }
+      }
+    }
+
+    // 4. Buscar Valor Total
+    const valuePatterns = [
+      /VALOR TOTAL\s*:?\s*R?\$?\s*([\d.,]+)/i,
+      /TOTAL\s*:?\s*R?\$?\s*([\d.,]+)/i,
+      /VLR TOTAL\s*:?\s*([\d.,]+)/i,
+      /R\$\s*([\d.,]+)/i,
+      /TOTAL DA NOTA\s*:?\s*R?\$?\s*([\d.,]+)/i,
+      /VALOR\s*:?\s*R?\$?\s*([\d.,]+)/i
+    ];
+
+    for (const pattern of valuePatterns) {
+      const match = text.match(pattern);
+      if (match && match[1]) {
+        let rawValue = match[1].trim();
+        if (rawValue.includes('.') && rawValue.includes(',')) {
+          rawValue = rawValue.replace(/\./g, '').replace(',', '.');
+        } else if (rawValue.includes(',')) {
+          rawValue = rawValue.replace(',', '.');
+        }
+        const numericValue = parseFloat(rawValue);
+        if (!isNaN(numericValue) && numericValue > 0 && numericValue < 10000000) {
+          result.value = Math.round(numericValue * 100) / 100;
+          console.log('✅ Valor encontrado:', result.value);
+          break;
+        }
+      }
+    }
+
+    // 5. Buscar Data de Emissão
+    const datePatterns = [
+      /DATA DE EMISSÃO\s*:?\s*(\d{2}\/\d{2}\/\d{4})/i,
+      /EMISSÃO\s*:?\s*(\d{2}\/\d{2}\/\d{4})/i,
+      /DATA\s*:?\s*(\d{2}\/\d{2}\/\d{4})/i,
+      /(\d{2})\/(\d{2})\/(\d{4})/
+    ];
+
+    for (const pattern of datePatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        let day, month, year;
+        if (match[1] && match[2] && match[3] && !match[1].includes('/')) {
+          day = match[1];
+          month = match[2];
+          year = match[3];
+        } else if (match[1] && match[1].includes('/')) {
+          const parts = match[1].split('/');
+          if (parts.length === 3) {
+            day = parts[0];
+            month = parts[1];
+            year = parts[2];
+          }
+        }
+        
+        if (day && month && year) {
+          const dayNum = parseInt(day);
+          const monthNum = parseInt(month);
+          const yearNum = parseInt(year);
+          
+          if (dayNum >= 1 && dayNum <= 31 && monthNum >= 1 && monthNum <= 12 && yearNum >= 2000 && yearNum <= 2030) {
+            result.issueDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+            console.log('✅ Data encontrada:', result.issueDate);
+            break;
+          }
+        }
+      }
+    }
+
+    return result;
+  };
+
+  const extractData = async (file: File) => {
+    setProcessing(true);
+    setProgress(0);
+    setError(null);
+    setFileName(file.name);
+
+    try {
+      const fileType = file.type;
+      let text = '';
+
+      if (fileType === 'application/pdf') {
+        setImage(null);
+        text = await extractTextFromPDF(file);
+      } else if (fileType.startsWith('image/')) {
+        const imageUrl = URL.createObjectURL(file);
+        setImage(imageUrl);
+        text = await extractTextFromImage(file);
+      } else {
+        setError('Formato não suportado. Use imagem (JPG, PNG) ou PDF.');
+        return;
+      }
+
+      if (!text || text.trim().length === 0) {
+        setError('Não foi possível extrair texto do arquivo.');
+        return;
+      }
+
+      const extractedData = parseDocumentText(text, file.name);
+      
+      if (Object.keys(extractedData).length === 0) {
+        setError('Não foi possível identificar dados. Tente um arquivo mais legível.');
+        return;
+      }
+      
+      onDataExtracted(extractedData);
+      
+    } catch (err) {
+      console.error('Erro na extração:', err);
+      setError('Erro ao processar o arquivo.');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+      if (validTypes.includes(file.type)) {
+        extractData(file);
+      } else {
+        setError('Formato não suportado. Use imagem (JPG, PNG) ou PDF.');
+      }
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+      if (validTypes.includes(file.type)) {
+        extractData(file);
+      } else {
+        setError('Formato não suportado. Use imagem (JPG, PNG) ou PDF.');
+      }
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+  };
+
+  const styles = {
+    overlay: {
+      position: 'fixed' as const,
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'rgba(0,0,0,0.7)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 2000,
+    },
+    modal: {
+      background: 'white',
+      borderRadius: '20px',
+      width: '90%',
+      maxWidth: '500px',
+      maxHeight: '90vh',
+      overflow: 'hidden' as const,
+    },
+    header: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: '1rem 1.5rem',
+      borderBottom: '1px solid #e2e8f0',
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      color: 'white',
+    },
+    closeButton: {
+      background: 'none',
+      border: 'none',
+      fontSize: '1.5rem',
+      cursor: 'pointer',
+      color: 'white',
+    },
+    content: {
+      padding: '2rem',
+      minHeight: '300px',
+    },
+    dropZone: {
+      border: '2px dashed #cbd5e1',
+      borderRadius: '12px',
+      padding: '2rem',
+      textAlign: 'center' as const,
+      cursor: 'pointer',
+    },
+    dropZoneIcon: {
+      fontSize: '3rem',
+      marginBottom: '1rem',
+    },
+    processing: {
+      textAlign: 'center' as const,
+    },
+    spinner: {
+      width: '40px',
+      height: '40px',
+      border: '4px solid #e2e8f0',
+      borderTopColor: '#667eea',
+      borderRadius: '50%',
+      margin: '0 auto 1rem',
+    },
+    progressBar: {
+      background: '#e2e8f0',
+      borderRadius: '10px',
+      height: '8px',
+      margin: '1rem 0',
+    },
+    progressFill: {
+      background: 'linear-gradient(90deg, #667eea, #764ba2)',
+      height: '100%',
+      width: '0%',
+    },
+    error: {
+      textAlign: 'center' as const,
+      color: '#ef4444',
+    },
+    retryButton: {
+      marginTop: '1rem',
+      padding: '0.5rem 1rem',
+      background: '#3b82f6',
+      color: 'white',
+      border: 'none',
+      borderRadius: '8px',
+      cursor: 'pointer',
+    },
+    footer: {
+      padding: '1rem 1.5rem',
+      borderTop: '1px solid #e2e8f0',
+      display: 'flex',
+      justifyContent: 'flex-end',
+    },
+    cancelButton: {
+      padding: '0.5rem 1rem',
+      background: '#64748b',
+      color: 'white',
+      border: 'none',
+      borderRadius: '8px',
+      cursor: 'pointer',
+    },
+  };
+
+  return (
+    <div style={styles.overlay}>
+      <div style={styles.modal}>
+        <div style={styles.header}>
+          <h3>📄 Importar Documento Fiscal</h3>
+          <button style={styles.closeButton} onClick={onClose}>×</button>
+        </div>
+
+        <div style={styles.content}>
+          {!processing && !image && !error && (
+            <div style={styles.dropZone} onDrop={handleDrop} onDragOver={handleDragOver} onClick={() => fileInputRef.current?.click()}>
+              <div style={styles.dropZoneIcon}>📄</div>
+              <p>Clique ou arraste o arquivo</p>
+              <p style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Formatos: PDF (NF ou Empenho), JPG, PNG</p>
+              <input ref={fileInputRef} type="file" accept=".pdf,image/jpeg,image/jpg,image/png" onChange={handleFileChange} style={{ display: 'none' }} />
+            </div>
+          )}
+
+          {processing && (
+            <div style={styles.processing}>
+              <div style={styles.spinner}></div>
+              <p>Processando {fileName}...</p>
+              <div style={styles.progressBar}>
+                <div style={{ ...styles.progressFill, width: `${progress}%` }} />
+              </div>
+              <p>{progress}%</p>
+            </div>
+          )}
+
+          {error && (
+            <div style={styles.error}>
+              <p>❌ {error}</p>
+              <button style={styles.retryButton} onClick={() => { setError(null); setImage(null); setFileName(''); }}>Tentar novamente</button>
+            </div>
+          )}
+
+          {image && !processing && !error && (
+            <div style={{ textAlign: 'center' }}>
+              <img src={image} alt="Preview" style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '8px' }} />
+              <p style={{ color: '#10b981', marginTop: '1rem' }}>✅ Arquivo carregado!</p>
+            </div>
+          )}
+        </div>
+
+        <div style={styles.footer}>
+          <button style={styles.cancelButton} onClick={onClose}>Fechar</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default OCRScanner;

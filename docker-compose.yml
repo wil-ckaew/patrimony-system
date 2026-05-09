@@ -1,0 +1,89 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:13
+    container_name: patrimony-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: patrimony
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/migrations:/docker-entrypoint-initdb.d
+      - ./backups:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: patrimony-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: "postgres://postgres:password@db:5432/patrimony"
+      RUST_LOG: debug
+      JWT_SECRET: seu_jwt_secret_super_seguro_aqui
+    volumes:
+      - ./uploads:/app/uploads
+      - ./documents:/app/documents
+      - ./backups:/app/backups
+      - ./restore-backup.sh:/app/restore-backup.sh
+      - ./backup.sh:/app/backup.sh
+
+  frontend:
+    build: ./frontend
+    container_name: patrimony-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8080/api
+      NEXT_PUBLIC_BACKEND_URL: http://localhost:8080
+
+  ai-service:
+    build: ./ai-service
+    container_name: patrimony-ai
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./ai-service/models:/app/models
+
+  backup:
+    image: postgres:13
+    container_name: patrimony-backup
+    restart: unless-stopped
+    depends_on:
+      - db
+    volumes:
+      - ./backups:/backups
+    environment:
+      POSTGRES_PASSWORD: password
+    entrypoint: >
+      bash -c "
+      apt-get update &&
+      apt-get install -y cron &&
+      echo '0 2 * * * pg_dump -h db -U postgres patrimony > /backups/backup-$$(date +\%Y-\%m-\%d_\%H-\%M-\%S).sql' > /etc/cron.d/db-backup &&
+      echo '0 3 * * * find /backups -name \"*.sql\" -mtime +7 -delete' >> /etc/cron.d/db-backup &&
+      chmod 0644 /etc/cron.d/db-backup &&
+      crontab /etc/cron.d/db-backup &&
+      cron -f
+      "
+
+volumes:
+  postgres_data:

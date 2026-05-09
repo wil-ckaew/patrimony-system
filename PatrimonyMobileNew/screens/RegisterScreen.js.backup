@@ -1,0 +1,246 @@
+// screens/RegisterScreen.js
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  Alert,
+} from 'react-native';
+import { useAuth } from '../contexts/AuthContext';
+
+export default function RegisterScreen({ navigation }) {
+  const [formData, setFormData] = useState({
+    company_name: '',
+    department: '',
+    username: '',
+    password: '',
+    email: '',
+    role: 'user'
+  });
+  const [loading, setLoading] = useState(false);
+  const { register } = useAuth();
+
+  const handleRegister = async () => {
+    if (!formData.company_name || !formData.department || !formData.username || !formData.password) {
+      Alert.alert('Erro', 'Por favor, preencha todos os campos obrigatórios');
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      Alert.alert('Erro', 'A senha deve ter pelo menos 6 caracteres');
+      return;
+    }
+
+    setLoading(true);
+    const result = await register(formData);
+    setLoading(false);
+
+    if (result.success) {
+      Alert.alert('Sucesso', 'Usuário cadastrado com sucesso! Faça login para continuar.');
+      navigation.navigate('Login');
+    } else {
+      Alert.alert('Erro', result.error || 'Erro ao cadastrar usuário');
+    }
+  };
+
+  const handleInputChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  return (
+    <ScrollView contentContainerStyle={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Cadastrar Novo Usuário</Text>
+      </View>
+
+      <View style={styles.form}>
+        <Text style={styles.label}>Empresa/Órgão *</Text>
+        <TextInput
+          style={styles.input}
+          value={formData.company_name}
+          onChangeText={(text) => handleInputChange('company_name', text)}
+          placeholder="Prefeitura Municipal"
+          editable={!loading}
+        />
+
+        <Text style={styles.label}>Departamento *</Text>
+        <TextInput
+          style={styles.input}
+          value={formData.department}
+          onChangeText={(text) => handleInputChange('department', text)}
+          placeholder="Educação, Saúde, Administração..."
+          editable={!loading}
+        />
+
+        <Text style={styles.label}>Usuário *</Text>
+        <TextInput
+          style={styles.input}
+          value={formData.username}
+          onChangeText={(text) => handleInputChange('username', text)}
+          placeholder="Nome de usuário"
+          autoCapitalize="none"
+          editable={!loading}
+        />
+
+        <Text style={styles.label}>Senha *</Text>
+        <TextInput
+          style={styles.input}
+          value={formData.password}
+          onChangeText={(text) => handleInputChange('password', text)}
+          placeholder="Mínimo 6 caracteres"
+          secureTextEntry
+          editable={!loading}
+        />
+
+        <Text style={styles.label}>Email (opcional)</Text>
+        <TextInput
+          style={styles.input}
+          value={formData.email}
+          onChangeText={(text) => handleInputChange('email', text)}
+          placeholder="email@exemplo.com"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          editable={!loading}
+        />
+
+        <Text style={styles.label}>Tipo de Usuário *</Text>
+        <View style={styles.radioGroup}>
+          <TouchableOpacity
+            style={[styles.radioButton, formData.role === 'user' && styles.radioButtonSelected]}
+            onPress={() => handleInputChange('role', 'user')}
+            disabled={loading}
+          >
+            <Text style={styles.radioText}>Usuário</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.radioButton, formData.role === 'admin' && styles.radioButtonSelected]}
+            onPress={() => handleInputChange('role', 'admin')}
+            disabled={loading}
+          >
+            <Text style={styles.radioText}>Administrador</Text>
+          </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity
+          style={[styles.button, loading && styles.buttonDisabled]}
+          onPress={handleRegister}
+          disabled={loading}
+        >
+          <Text style={styles.buttonText}>
+            {loading ? 'Cadastrando...' : 'Cadastrar'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => navigation.navigate('Login')}
+          style={styles.loginLink}
+          disabled={loading}
+        >
+          <Text style={styles.loginText}>
+            Já tem uma conta? <Text style={styles.loginBold}>Fazer login</Text>
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flexGrow: 1,
+    backgroundColor: '#f8fafc',
+    padding: 20,
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: 40,
+    marginTop: 40,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1e3a8a',
+    textAlign: 'center',
+  },
+  form: {
+    backgroundColor: 'white',
+    padding: 25,
+    borderRadius: 15,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  input: {
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+    borderRadius: 10,
+    padding: 15,
+    fontSize: 16,
+    marginBottom: 20,
+    backgroundColor: '#f9fafb',
+  },
+  radioGroup: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  radioButton: {
+    flex: 1,
+    padding: 15,
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+    borderRadius: 10,
+    alignItems: 'center',
+    marginHorizontal: 5,
+    backgroundColor: '#f9fafb',
+  },
+  radioButtonSelected: {
+    borderColor: '#2563eb',
+    backgroundColor: '#dbeafe',
+  },
+  radioText: {
+    fontSize: 14,
+    color: '#374151',
+    fontWeight: '500',
+  },
+  button: {
+    backgroundColor: '#059669',
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  buttonDisabled: {
+    opacity: 0.7,
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  loginLink: {
+    alignItems: 'center',
+  },
+  loginText: {
+    color: '#6b7280',
+    fontSize: 14,
+  },
+  loginBold: {
+    color: '#2563eb',
+    fontWeight: 'bold',
+  },
+});

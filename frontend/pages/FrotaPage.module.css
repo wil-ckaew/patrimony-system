@@ -1,0 +1,82 @@
+.pageWrapper {
+  min-height: 100vh;
+  padding: 2rem;
+  background: #f4f7fb;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+  color: white;
+  border-radius: 28px;
+  padding: 1.75rem 2rem;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1.5rem;
+  background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+  padding: 0.75rem 1.1rem;
+  border-radius: 16px;
+  box-shadow: 0 12px 30px rgba(59, 130, 246, 0.25);
+  min-width: 84px;
+}
+
+.headerText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.headerTitle {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.headerSub {
+  margin: 0.35rem 0 0;
+  font-size: 0.95rem;
+  opacity: 0.92;
+  color: #dbeafe;
+}
+
+.topbarActions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.actionButton {
+  background: rgba(255, 255, 255, 0.12);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  padding: 0.95rem 1.3rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.actionButton:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.18);
+}

@@ -1,0 +1,256 @@
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: white;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 1000px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 24px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: #333;
+}
+
+.closeBtn {
+  background: none;
+  border: none;
+  font-size: 28px;
+  cursor: pointer;
+  color: #666;
+  transition: color 0.2s;
+}
+
+.closeBtn:hover {
+  color: #000;
+}
+
+.actions {
+  margin-bottom: 24px;
+}
+
+.createBtn {
+  background: #28a745;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.createBtn:hover {
+  background: #218838;
+}
+
+.createBtn:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+}
+
+.error {
+  background: #f8d7da;
+  color: #721c24;
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+  border-left: 4px solid #dc3545;
+}
+
+.success {
+  background: #d4edda;
+  color: #155724;
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+  border-left: 4px solid #28a745;
+}
+
+.content {
+  min-height: 300px;
+}
+
+.loading, .empty {
+  text-align: center;
+  color: #666;
+  padding: 40px 0;
+}
+
+.yearNav {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid #e0e0e0;
+  padding-bottom: 12px;
+}
+
+.yearButton {
+  background: none;
+  border: none;
+  padding: 8px 16px;
+  font-size: 16px;
+  cursor: pointer;
+  border-radius: 20px;
+  color: #555;
+  transition: all 0.2s;
+}
+
+.yearButton:hover {
+  background: #f0f0f0;
+}
+
+.yearActive {
+  background: #007bff;
+  color: white;
+  font-weight: 500;
+}
+
+.yearActive:hover {
+  background: #0056b3;
+}
+
+.monthGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.monthCard {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.monthCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  border-color: #007bff;
+}
+
+.monthName {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: #333;
+  text-transform: capitalize;
+}
+
+.monthBadge {
+  background: #007bff;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  min-width: 30px;
+}
+
+.monthBackups {
+  margin-top: 20px;
+}
+
+.backupHeader {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.backButton {
+  background: none;
+  border: 1px solid #007bff;
+  color: #007bff;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.backButton:hover {
+  background: #007bff;
+  color: white;
+}
+
+.backupHeader h3 {
+  margin: 0;
+  font-size: 1.3rem;
+  color: #333;
+  text-transform: capitalize;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+.table th, .table td {
+  border: 1px solid #dee2e6;
+  padding: 10px;
+  text-align: left;
+}
+
+.table th {
+  background: #f2f2f2;
+  font-weight: 600;
+}
+
+.table tr:hover {
+  background: #f8f9fa;
+}
+
+.restoreBtn {
+  background: #007bff;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.restoreBtn:hover {
+  background: #0056b3;
+}
+
+.restoreBtn:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+}

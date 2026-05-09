@@ -1,0 +1,85 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:13
+    environment:
+      POSTGRES_DB: patrimony
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/migrations:/docker-entrypoint-initdb.d
+      - ./backups:/backups  # ✅ Pasta para backups
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  backend:
+    build: ./backend
+    # running in the default bridge network; the host gateway (172.18.0.1)
+    # is reachable from containers even with the host firewall enabled, so we
+    # point the connection at the mapped port on the host rather than trying to
+    # resolve the `db` service name (which was previously blocked by a local
+    # iptables/ufw rule).
+    depends_on:
+      - db
+    ports:
+      - "8080:8080"
+    environment:
+      # gateway address for the bridge network may change if the subnet is
+      # recreated; to discover it dynamically one could use Docker CLI, but
+      # hard-coding 172.18.0.1 works for the current setup.
+      #DATABASE_URL: "postgres://postgres:password@172.18.0.1:5433/patrimony"
+      DATABASE_URL: "postgres://postgres:password@db:5432/patrimony"
+      RUST_LOG: debug
+      JWT_SECRET: seu_jwt_secret_super_seguro_aqui
+    volumes:
+      - ./uploads:/app/uploads
+      - ./documents:/app/documents
+      - ./backups:/app/backups
+      - ./restore-backup.sh:/app/restore-backup.sh   # <-- ADICIONE ESTA LINHA
+      - ./backup.sh:/app/backup.sh          # <-- ADICIONE ESTA LINHA
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8080/api
+      NEXT_PUBLIC_BACKEND_URL: http://localhost:8080
+    restart: unless-stopped
+
+  ai-service:
+    build: ./ai-service
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./ai-service/models:/app/models
+
+  # ✅ NOVO SERVIÇO DE BACKUP AUTOMÁTICO
+  backup:
+    image: postgres:13  # Usa a mesma imagem do PostgreSQL
+    depends_on:
+      - db
+    volumes:
+      - ./backups:/backups
+      - ./backup-scripts:/backup-scripts
+    command: >
+      sh -c "
+      apt-get update && apt-get install -y cron && 
+      echo '0 2 * * * pg_dump -h db -U postgres patrimony > /backups/backup-$$(date +%Y%m%d_%H%M%S).sql && find /backups -name \"*.sql\" -mtime +7 -delete' > /etc/cron.d/backup &&
+      chmod 0644 /etc/cron.d/backup &&
+      cron -f"
+    environment:
+      POSTGRES_PASSWORD: password
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

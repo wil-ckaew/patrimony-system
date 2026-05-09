@@ -1,0 +1,370 @@
+/* ===== ESTILOS RESPONSIVOS ===== */
+
+/* Tablets */
+@media (max-width: 1024px) {
+    .topbar {
+      padding: 0.8rem 1.5rem;
+    }
+    
+    .headerTitle {
+      font-size: 1.1rem;
+    }
+    
+    .headerSub {
+      font-size: 0.8rem;
+    }
+    
+    .btn {
+      padding: 0.5rem 1rem;
+      font-size: 0.8rem;
+    }
+    
+    .mainContent {
+      padding: 1.5rem;
+    }
+  }
+  
+  /* Telefones grandes */
+  @media (max-width: 768px) {
+    .container {
+      overflow-x: hidden;
+    }
+    
+    .topbar {
+      flex-direction: column;
+      gap: 1rem;
+      padding: 1rem;
+    }
+    
+    .headerLeft {
+      width: 100%;
+      justify-content: center;
+      text-align: center;
+    }
+    
+    .actionsContainer {
+      width: 100%;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    
+    .userInfo {
+      width: 100%;
+      text-align: center;
+      margin-right: 0;
+      margin-bottom: 0.5rem;
+    }
+    
+    .tabs {
+      padding: 0 1rem;
+      flex-wrap: wrap;
+    }
+    
+    .tab {
+      padding: 0.8rem 1rem;
+      font-size: 0.8rem;
+    }
+    
+    .tabFilter {
+      margin-left: 0;
+      width: 100%;
+      order: 3;
+      margin-top: 0.5rem;
+    }
+    
+    .filterToggle {
+      width: 100%;
+      justify-content: center;
+    }
+    
+    .filterPanel {
+      padding: 1rem;
+    }
+    
+    .formRow {
+      grid-template-columns: 1fr;
+    }
+    
+    .searchButtons {
+      flex-direction: column;
+    }
+    
+    .paginationControls {
+      flex-direction: column;
+      gap: 0.8rem;
+    }
+    
+    .itemsPerPage {
+      justify-content: center;
+    }
+    
+    .paginationButtons {
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    
+    .pageNumbers {
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+  }
+  
+  /* Telefones pequenos */
+  @media (max-width: 480px) {
+    .logo {
+      font-size: 1.2rem;
+      padding: 0.4rem 0.8rem;
+    }
+    
+    .headerTitle {
+      font-size: 1rem;
+    }
+    
+    .btn {
+      padding: 0.5rem 0.8rem;
+      font-size: 0.75rem;
+    }
+    
+    .btnIcon {
+      font-size: 0.9rem;
+    }
+    
+    .tab {
+      padding: 0.7rem 0.8rem;
+    }
+    
+    .tabIcon {
+      font-size: 0.9rem;
+    }
+    
+    .mainContent {
+      padding: 1rem;
+    }
+    
+    .modal {
+      width: 95%;
+      margin: 0.5rem;
+    }
+    
+    .modalHeader {
+      padding: 15px;
+    }
+    
+    .modalBody {
+      padding: 15px;
+    }
+    
+    .modalFooter {
+      padding: 15px;
+      flex-direction: column;
+    }
+    
+    .modalFooter .btn {
+      width: 100%;
+      margin-bottom: 0.5rem;
+    }
+    
+    .modalFooter .btn:last-child {
+      margin-bottom: 0;
+    }
+  }
+  
+  /* ===== MENU HAMBURGER PARA MOBILE ===== */
+  .mobileMenuButton {
+    display: none;
+    flex-direction: column;
+    justify-content: space-around;
+    width: 30px;
+    height: 30px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    z-index: 10;
+  }
+  
+  .mobileMenuButton span {
+    width: 30px;
+    height: 3px;
+    background: white;
+    border-radius: 5px;
+    transition: all 0.3s linear;
+    position: relative;
+    transform-origin: 1px;
+  }
+  
+  .mobileMenuButton.open span:nth-child(1) {
+    transform: rotate(45deg);
+  }
+  
+  .mobileMenuButton.open span:nth-child(2) {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  
+  .mobileMenuButton.open span:nth-child(3) {
+    transform: rotate(-45deg);
+  }
+  
+  .mobileMenuOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 100;
+    display: none;
+  }
+  
+  .mobileMenu {
+    position: fixed;
+    top: 0;
+    left: -300px;
+    width: 280px;
+    height: 100vh;
+    background: white;
+    z-index: 101;
+    transition: left 0.3s ease;
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+    overflow-y: auto;
+  }
+  
+  .mobileMenu.open {
+    left: 0;
+  }
+  
+  .mobileMenuHeader {
+    padding: 1.5rem;
+    background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .mobileMenuClose {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+  }
+  
+  .mobileMenuItems {
+    padding: 1rem 0;
+  }
+  
+  .mobileMenuItem {
+    display: flex;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    color: #333;
+    text-decoration: none;
+    border-bottom: 1px solid #eee;
+    transition: background 0.2s;
+  }
+  
+  .mobileMenuItem:hover {
+    background: #f5f5f5;
+  }
+  
+  .mobileMenuIcon {
+    margin-right: 1rem;
+    font-size: 1.2rem;
+    width: 24px;
+    text-align: center;
+  }
+  
+  /* Mostrar menu hamburger apenas em mobile */
+  @media (max-width: 768px) {
+    .mobileMenuButton {
+      display: flex;
+      position: absolute;
+      left: 1rem;
+      top: 1.2rem;
+    }
+    
+    .headerLeft {
+      margin-left: 40px;
+    }
+    
+    .mobileMenuOverlay.active {
+      display: block;
+    }
+  }
+  
+  /* ===== MELHORIAS PARA TABELAS EM MOBILE ===== */
+  .responsiveTable {
+    overflow-x: auto;
+  }
+  
+  @media (max-width: 768px) {
+    .responsiveTable table {
+      min-width: 600px;
+    }
+    
+    .tableRow {
+      display: flex;
+      flex-direction: column;
+      margin-bottom: 1rem;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      padding: 1rem;
+    }
+    
+    .tableCell {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid #eee;
+    }
+    
+    .tableCell:last-child {
+      border-bottom: none;
+    }
+    
+    .tableCell::before {
+      content: attr(data-label);
+      font-weight: bold;
+      text-transform: capitalize;
+      margin-right: 1rem;
+    }
+  }
+  
+  /* ===== BOTÕES FLUTUANTES PARA MOBILE ===== */
+  .floatingActionButton {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    color: white;
+    border: none;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.5rem;
+    z-index: 99;
+    cursor: pointer;
+  }
+  
+  .floatingActionButton:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.4);
+  }
+  
+  @media (max-width: 768px) {
+    .floatingActionButton {
+      display: flex;
+    }
+    
+    /* Esconder alguns botões da toolbar em mobile */
+    .actionsContainer .btn:nth-child(n+3) {
+      display: none;
+    }
+  }
