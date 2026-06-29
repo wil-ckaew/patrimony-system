@@ -1,90 +1,380 @@
+/* components/FleetList.module.css */
+
 .fleetWrapper {
   width: 100%;
 }
 
+/* components/FleetList.module.css */
+
+/* ========================================
+   SEARCH BAR - CORRIGIDA COM TAMANHOS FIXOS
+======================================== */
+
 .searchBar {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  justify-content: space-between;
-  margin-bottom: 1rem;
+  flex-wrap: nowrap;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
   align-items: center;
+  justify-content: flex-start;
+}
+
+.searchWrapper {
+  position: relative;
+  width: 380px;
+  max-width: 380px;
+  flex-shrink: 0;
 }
 
 .searchInput {
-  flex: 1;
-  min-width: 240px;
+  width: 100%;
   border-radius: 18px;
   border: 1px solid #cbd5e1;
-  padding: 0.95rem 1rem;
-  font-size: 0.95rem;
+  padding: 0.75rem 2.5rem 0.75rem 1rem;
+  font-size: 0.9rem;
   color: #0f172a;
   background: white;
-  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08);
+  transition: all 0.2s ease;
 }
 
-.searchSummary {
-  color: #475569;
-  font-weight: 600;
-  min-width: 160px;
+.searchInput:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
+
+.clearSearchButton {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #e2e8f0;
+  border: none;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: #64748b;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+
+.clearSearchButton:hover {
+  background: #cbd5e1;
+  color: #0f172a;
+  transform: translateY(-50%) scale(1.05);
+}
+
+/* Botão com total de registros dentro */
+.searchSummary {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+}
+
+.clearAllButton {
+  background: #e2e8f0;
+  border: none;
+  border-radius: 40px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #475569;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.clearAllButton:hover {
+  background: #cbd5e1;
+  color: #0f172a;
+  transform: translateY(-1px);
+}
+
+.totalCount {
+  background: #64748b;
+  color: white;
+  border-radius: 30px;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Quando tem busca ativa, muda a cor */
+.clearAllButton.active {
+  background: #2563eb;
+  color: white;
+}
+
+.clearAllButton.active .totalCount {
+  background: white;
+  color: #2563eb;
+}
+
+/* Responsivo */
+@media (max-width: 768px) {
+  .searchBar {
+    flex-wrap: wrap;
+  }
+  
+  .searchWrapper {
+    width: 100%;
+    max-width: none;
+    flex-shrink: 1;
+  }
+  
+  .searchSummary {
+    margin-left: 0;
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .searchInput {
+    padding: 0.65rem 2.5rem 0.65rem 0.8rem;
+    font-size: 0.85rem;
+  }
+  
+  .clearAllButton {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+  }
+  
+  .totalCount {
+    font-size: 0.7rem;
+    padding: 0.1rem 0.5rem;
+  }
+}
+/* ========================================
+   TABLE
+======================================== */
 
 .tableContainer {
   overflow-x: auto;
   border-radius: 24px;
   border: 1px solid rgba(148, 163, 184, 0.18);
   background: white;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.05);
 }
 
 .fleetTable {
   width: 100%;
   border-collapse: collapse;
-  min-width: 760px;
+  min-width: 850px;
 }
 
 .fleetTable th,
 .fleetTable td {
-  padding: 1rem 1rem;
+  padding: 1rem;
   text-align: left;
   border-bottom: 1px solid #e2e8f0;
-  vertical-align: top;
+  vertical-align: middle;
 }
 
 .fleetTable th {
   background: #f8fafc;
   color: #475569;
   font-weight: 700;
+  font-size: 0.9rem;
+  white-space: nowrap;
 }
 
 .tableRow {
   cursor: pointer;
-  transition: background 0.2s ease;
+  transition:
+    background 0.2s ease,
+    transform 0.15s ease;
 }
 
 .tableRow:hover {
   background: #f8fbff;
 }
 
+/* ========================================
+   EXPANDED ROW
+======================================== */
+
 .expandedRow td {
   background: #f8fafc;
-  padding-bottom: 1.25rem;
+  padding: 1.5rem;
 }
 
 .expandedContent {
   display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 1.5rem;
+}
+
+/* SEÇÃO DE IMAGEM - IGUAL PATRIMONY */
+.imageSection {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 1rem;
-  padding: 1rem 0;
+}
+
+.patrimonyImage {
+  width: 100%;
+  max-width: 300px;
+  height: auto;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+.patrimonyImage:hover {
+  transform: scale(1.02);
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15);
+}
+
+.viewImageButton {
+  padding: 0.5rem 1rem;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.viewImageButton:hover {
+  background: #2563eb;
+}
+
+.noImage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 150px;
+  background: #f8fafc;
+  border-radius: 8px;
+  color: #64748b;
+  font-style: italic;
+}
+
+/* GRID DE DETALHES */
+.detailsGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
 .expandedSection {
-  min-width: 220px;
+  background: white;
+  border-radius: 18px;
+  padding: 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
 }
 
 .expandedSection strong {
   display: block;
-  margin-bottom: 0.45rem;
+  margin-bottom: 0.55rem;
   color: #0f172a;
+  font-size: 0.95rem;
 }
+
+.expandedSection p {
+  margin: 0;
+  color: #334155;
+  line-height: 1.5;
+}
+
+.detailLabel {
+  display: block;
+  margin-top: 0.9rem;
+  margin-bottom: 0.35rem;
+  color: #64748b;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+/* ========================================
+   IMAGE MODAL - IGUAL PATRIMONY
+======================================== */
+
+.imageModal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.imageModalContent {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+}
+
+.imageModalImg {
+  max-width: 100%;
+  max-height: 90vh;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+.imageModalClose {
+  position: absolute;
+  top: -40px;
+  right: 0;
+  background: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ========================================
+   STATUS
+======================================== */
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.45rem 0.85rem;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #4338ca;
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.statusPill {
+  color: #1d4ed8;
+  font-weight: 700;
+  font-size: 0.85rem;
+  background: rgba(59, 130, 246, 0.12);
+  border-radius: 999px;
+  padding: 0.55rem 0.9rem;
+}
+
+/* ========================================
+   ACTIONS
+======================================== */
 
 .rowActions {
   display: flex;
@@ -94,51 +384,100 @@
 }
 
 .actionButton {
-  padding: 0.65rem 0.85rem;
-  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+
   border: none;
+  border-radius: 14px;
+
+  padding: 0.8rem 1rem;
+
   font-weight: 700;
+  font-size: 0.9rem;
+
   cursor: pointer;
+
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.actionButton:hover {
+  transform: translateY(-1px);
+}
+
+.actionButton:active {
+  transform: scale(0.98);
 }
 
 .editButton {
-  background: #4338ca;
+  background: linear-gradient(
+    135deg,
+    #4338ca 0%,
+    #4f46e5 100%
+  );
+
   color: white;
+
+  box-shadow: 0 8px 20px rgba(67, 56, 202, 0.18);
+}
+
+.editButton:hover {
+  box-shadow: 0 12px 26px rgba(67, 56, 202, 0.24);
 }
 
 .deleteButton {
-  background: #f97316;
+  background: linear-gradient(
+    135deg,
+    #f97316 0%,
+    #ea580c 100%
+  );
+
   color: white;
+
+  box-shadow: 0 8px 20px rgba(249, 115, 22, 0.18);
 }
 
-.emptyMessage {
-  padding: 2rem;
-  text-align: center;
-  color: #475569;
+.deleteButton:hover {
+  box-shadow: 0 12px 26px rgba(249, 115, 22, 0.24);
 }
 
-.statusBadge {
-  display: inline-flex;
-  padding: 0.4rem 0.8rem;
-  border-radius: 999px;
-  background: #eef2ff;
-  color: #4338ca;
-  font-weight: 700;
-  font-size: 0.8rem;
+.buttonIcon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
 }
+
+/* ========================================
+   GRID / CARDS
+======================================== */
 
 .grid {
   display: grid;
-  grid-template-columns: repeat( auto-fit, minmax(280px, 1fr) );
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(280px, 1fr)
+  );
   gap: 1.25rem;
 }
 
 .card {
   padding: 1.4rem;
   border-radius: 24px;
-  background: linear-gradient(180deg, rgba(248,250,252,0.9) 0%, rgba(255,255,255,1) 100%);
-  border: 1px solid rgba(148,163,184,0.18);
+
+  background: linear-gradient(
+    180deg,
+    rgba(248, 250, 252, 0.9) 0%,
+    rgba(255, 255, 255, 1) 100%
+  );
+
+  border: 1px solid rgba(148, 163, 184, 0.18);
+
   box-shadow: 0 16px 40px rgba(15, 23, 42, 0.06);
+
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -169,15 +508,6 @@
   color: #0f172a;
 }
 
-.statusPill {
-  color: #1d4ed8;
-  font-weight: 700;
-  font-size: 0.85rem;
-  background: rgba(59,130,246,0.12);
-  border-radius: 999px;
-  padding: 0.55rem 0.9rem;
-}
-
 .detailRow {
   display: flex;
   justify-content: space-between;
@@ -187,17 +517,14 @@
   font-size: 0.95rem;
 }
 
-.detailLabel {
-  color: #64748b;
-}
-
 .notesBox {
   background: #f8fafc;
-  border: 1px solid rgba(148,163,184,0.16);
+  border: 1px solid rgba(148, 163, 184, 0.16);
   border-radius: 18px;
   padding: 1rem;
   color: #334155;
   font-size: 0.95rem;
+  line-height: 1.5;
 }
 
 .cardActions {
@@ -206,37 +533,11 @@
   flex-wrap: wrap;
 }
 
-.editButton,
-.deleteButton {
-  flex: 1;
-  border: none;
-  border-radius: 999px;
-  padding: 0.9rem 1rem;
-  cursor: pointer;
-  font-weight: 700;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
+/* ========================================
+   EMPTY / ERROR / MESSAGE
+======================================== */
 
-.editButton {
-  background: #4338ca;
-  color: white;
-}
-
-.editButton:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 20px rgba(67,56,202,0.18);
-}
-
-.deleteButton {
-  background: #f97316;
-  color: white;
-}
-
-.deleteButton:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 20px rgba(249,115,22,0.18);
-}
-
+.emptyMessage,
 .emptyState {
   padding: 3rem;
   text-align: center;
@@ -244,7 +545,7 @@
   font-size: 1rem;
   border-radius: 24px;
   background: #f8fafc;
-  border: 1px dashed rgba(148,163,184,0.3);
+  border: 1px dashed rgba(148, 163, 184, 0.3);
 }
 
 .message,
@@ -253,6 +554,7 @@
   border-radius: 24px;
   text-align: center;
   font-size: 1rem;
+  font-weight: 600;
 }
 
 .message {
@@ -263,4 +565,281 @@
 .messageError {
   background: #fee2e2;
   color: #b91c1c;
+}
+
+/* ========================================
+   PAGINATION
+======================================== */
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1.8rem;
+  flex-wrap: wrap;
+}
+
+.pageNumbers {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.pageButton,
+.pageNumber {
+  border: none;
+  border-radius: 14px;
+
+  padding: 0.8rem 1rem;
+
+  cursor: pointer;
+
+  font-weight: 700;
+  font-size: 0.92rem;
+
+  transition:
+    all 0.2s ease;
+
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.pageButton:hover,
+.pageNumber:hover {
+  background: #cbd5e1;
+  transform: translateY(-1px);
+}
+
+.activePage {
+  background: #2563eb;
+  color: white;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.20);
+}
+
+.pageButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ========================================
+   RESPONSIVE - IGUAL PATRIMONY
+======================================== */
+
+@media (max-width: 1366px) {
+  .patrimonyImage {
+    max-width: 200px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .patrimonyImage {
+    max-width: 150px;
+  }
+}
+
+@media (max-width: 768px) {
+  .searchBar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .searchWrapper {
+    min-width: auto;
+  }
+
+  .searchSummary {
+    text-align: center;
+    justify-content: center;
+  }
+
+  .fleetTable {
+    min-width: 720px;
+  }
+
+  .rowActions {
+    flex-direction: column;
+  }
+
+  .actionButton {
+    width: 100%;
+  }
+
+  .expandedContent {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  .imageSection {
+    align-items: center;
+  }
+  
+  .patrimonyImage {
+    max-width: 200px;
+  }
+
+  .pagination {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 480px) {
+  .expandedRow td {
+    padding: 1rem;
+  }
+  
+  .patrimonyImage {
+    max-width: 150px;
+  }
+  
+  .noImage {
+    height: 100px;
+    font-size: 0.8rem;
+  }
+  
+  .viewImageButton {
+    font-size: 0.75rem;
+    padding: 0.4rem 0.8rem;
+  }
+  
+  .expandedSection {
+    padding: 0.75rem;
+  }
+  
+  .expandedSection strong {
+    font-size: 0.85rem;
+  }
+  
+  .detailLabel {
+    font-size: 0.75rem;
+    margin-top: 0.7rem;
+  }
+  
+  .searchInput {
+    padding: 0.75rem 2.5rem 0.75rem 0.75rem;
+    font-size: 0.85rem;
+  }
+  
+  .clearSearchButton {
+    width: 20px;
+    height: 20px;
+    font-size: 0.75rem;
+  }
+}
+
+@media (max-height: 700px) {
+  .expandedRow td {
+    padding: 1rem;
+  }
+  
+  .expandedContent {
+    max-height: 300px;
+    overflow-y: auto;
+  }
+  
+  .patrimonyImage {
+    max-width: 120px;
+  }
+  
+  .noImage {
+    height: 80px;
+  }
+  
+  .detailsGrid {
+    gap: 0.5rem;
+  }
+}
+
+/* ========================================
+   FROTA NÚMERO EM DESTAQUE - VERSÃO GRANDE
+======================================== */
+
+.fleetNumberHighlight {
+  background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+  border-radius: 20px;
+  padding: 1.2rem 0.8rem;
+  text-align: center;
+  width: 100%;
+  margin-top: 0.8rem;
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.25);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.fleetNumberHighlight:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 28px rgba(37, 99, 235, 0.35);
+}
+
+.fleetNumberLabel {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: rgba(255, 255, 255, 0.85);
+  margin-bottom: 0.5rem;
+}
+
+.fleetNumberValue {
+  display: block;
+  font-size: 2.5rem;
+  font-weight: 900;
+  color: white;
+  line-height: 1.2;
+  word-break: break-word;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  letter-spacing: 1px;
+}
+
+/* Responsivo para tablet */
+@media (max-width: 768px) {
+  .fleetNumberValue {
+    font-size: 2rem;
+  }
+  
+  .fleetNumberHighlight {
+    padding: 1rem 0.6rem;
+    border-radius: 18px;
+  }
+  
+  .fleetNumberLabel {
+    font-size: 0.7rem;
+    letter-spacing: 1.5px;
+  }
+}
+
+/* Responsivo para mobile */
+@media (max-width: 480px) {
+  .fleetNumberValue {
+    font-size: 1.8rem;
+  }
+  
+  .fleetNumberHighlight {
+    padding: 0.8rem 0.5rem;
+    border-radius: 16px;
+  }
+  
+  .fleetNumberLabel {
+    font-size: 0.65rem;
+    letter-spacing: 1px;
+    margin-bottom: 0.3rem;
+  }
+}
+
+/* Responsivo para altura limitada */
+@media (max-height: 700px) {
+  .fleetNumberValue {
+    font-size: 1.6rem;
+  }
+  
+  .fleetNumberHighlight {
+    padding: 0.6rem 0.5rem;
+    margin-top: 0.5rem;
+  }
+  
+  .fleetNumberLabel {
+    font-size: 0.6rem;
+    margin-bottom: 0.2rem;
+  }
 }

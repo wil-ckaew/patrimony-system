@@ -1,8 +1,8 @@
-//src/handlers/patrimony.rs
+// src/handlers/patrimony.rs
 use actix_web::{web, HttpResponse, HttpRequest};
 use sqlx::{PgPool, Row};
 use sqlx::postgres::PgRow;
-use chrono::{NaiveDate, Utc}; // ✅ Adicionar Utc aqui
+use chrono::{NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid; 
 use std::fs;
@@ -25,8 +25,8 @@ use crate::models::{Patrimony, CreatePatrimony, UpdatePatrimony, FiscalDocument,
 // Estruturas para autenticação JWT
 #[derive(Serialize, Deserialize)]
 struct Claims {
-    sub: String, // user ID
-    exp: usize,  // expiration time
+    sub: String,
+    exp: usize,
     role: String,
 }
 
@@ -45,14 +45,23 @@ pub struct DepartmentQuery {
     pub name: Option<String>,
     pub min_value: Option<f64>,
     pub max_value: Option<f64>,
-    pub sector: Option<String>, // ✅ ADICIONE ESTA LINHA
-    pub is_vehicle: Option<bool>, // ✅ FILTRO POR VEÍCULOS
-    // 🔽 NOVOS CAMPOS
+    pub sector: Option<String>,
+    pub is_vehicle: Option<bool>,
     pub description: Option<String>,
     pub invoice_number: Option<String>,
     pub commitment_number: Option<String>,
-    pub search: Option<String>,  // ✅ ADICIONE ESTA LINHA
+    pub search: Option<String>,
+    // ✅ NOVOS FILTROS PARA FROTA
+    pub fleet_number: Option<String>,
+    pub fleet_notes: Option<String>,
 }
+
+// ✅ NOVA STRUCT PARA VERIFICAÇÃO DE PLACA
+#[derive(Deserialize)]
+pub struct CheckPlateQuery {
+    pub plate: String,
+}
+
 #[derive(Serialize)]
 pub struct StatsResponse {
     pub total: i64,
@@ -105,7 +114,6 @@ pub struct LoginResponse {
     pub user: User,
 }
 
-// No arquivo patrimony.rs, adicione esta struct para os filtros
 #[derive(Deserialize)]
 pub struct PatrimonyFilters {
     pub plate: Option<String>,
@@ -117,8 +125,404 @@ pub struct PatrimonyFilters {
 }
 
 #[derive(Deserialize)]
+pub struct BulkPatrimonyRequest {
+    pub start_plate: i32,
+    pub end_plate: i32,
+    pub name: String,
+    pub description: Option<String>,
+    pub acquisition_date: NaiveDate,
+    pub value: f64,
+    pub department: String,
+    pub status: String,
+    pub invoice_number: Option<String>,
+    pub commitment_number: Option<String>,
+    pub denf_se_number: Option<String>,
+    pub sector: Option<String>,
+    pub nf_issue_date: Option<NaiveDate>,
+    pub supplier: Option<String>,
+    pub is_vehicle: bool,
+}
+
+#[derive(Deserialize)]
 pub struct RestoreRequest {
     pub backup_file: String,
+}
+
+// ✅ NOVO ENDPOINT PARA VERIFICAR PLACA EXATA
+pub async fn check_plate_exists(
+    pool: web::Data<PgPool>,
+    query: web::Query<CheckPlateQuery>,
+    req: HttpRequest,
+) -> HttpResponse {
+    let _user = match auth_middleware(&req, pool.get_ref()).await {
+        Ok(Some(user)) => user,
+        Ok(None) => return HttpResponse::Unauthorized().json("Authentication required"),
+        Err(e) => return e,
+    };
+
+    let plate = query.plate.trim();
+    
+    // ✅ BUSCA EXATA COM "="
+    let result = sqlx::query(
+        "SELECT EXISTS(SELECT 1 FROM patrimonies WHERE plate = $1) as exists"
+    )
+    .bind(plate)
+    .map(|row: PgRow| row.get::<bool, _>("exists"))
+    .fetch_one(pool.get_ref())
+    .await;
+
+    match result {
+        Ok(exists) => HttpResponse::Ok().json(serde_json::json!({
+            "exists": exists,
+            "plate": plate
+        })),
+        Err(e) => {
+            eprintln!("Erro ao verificar placa: {:?}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Erro ao verificar placa"
+            }))
+        }
+    }
+}
+
+// ==================== ENDPOINT DE CADASTRO EM MASSA ====================
+pub async fn create_bulk_patrimonies(
+    pool: web::Data<PgPool>,
+    req: HttpRequest,
+    bulk_data: web::Json<BulkPatrimonyRequest>,
+) -> HttpResponse {
+    let user = match auth_middleware(&req, pool.get_ref()).await {
+        Ok(Some(user)) => user,
+        Ok(None) => {
+            return HttpResponse::Unauthorized()
+                .json("Authentication required");
+        }
+        Err(e) => {
+            return e;
+        }
+    };
+
+    println!("====================================");
+    println!("📦 DADOS RECEBIDOS NO BULK");
+    println!("department: {:?}", bulk_data.department);
+    println!("status: {:?}", bulk_data.status);
+    println!("sector: {:?}", bulk_data.sector);
+    println!("supplier: {:?}", bulk_data.supplier);
+    println!("invoice_number: {:?}", bulk_data.invoice_number);
+    println!("commitment_number: {:?}", bulk_data.commitment_number);
+    println!("nf_issue_date: {:?}", bulk_data.nf_issue_date);
+    println!("====================================");
+
+    let start = bulk_data.start_plate;
+    let end = bulk_data.end_plate;
+
+    if start > end {
+        return HttpResponse::BadRequest()
+            .json("Número inicial deve ser menor que o final");
+    }
+
+    if bulk_data.name.trim().is_empty() {
+        return HttpResponse::BadRequest()
+            .json("Nome do bem é obrigatório");
+    }
+
+    if bulk_data.value <= 0.0 {
+        return HttpResponse::BadRequest()
+            .json("Valor deve ser maior que zero");
+    }
+
+    let total_to_insert = (end - start + 1) as usize;
+    let description = bulk_data.description.clone().unwrap_or_default();
+
+    let invoice_number = bulk_data
+        .invoice_number
+        .clone()
+        .and_then(|s| normalize_optional_string(Some(s)));
+
+    let commitment_number = bulk_data
+        .commitment_number
+        .clone()
+        .and_then(|s| normalize_optional_string(Some(s)));
+
+    let denf_se_number = bulk_data
+        .denf_se_number
+        .clone()
+        .and_then(|s| normalize_optional_string(Some(s)));
+
+    let sector = bulk_data
+        .sector
+        .clone()
+        .and_then(|s| normalize_optional_string(Some(s)));
+
+    let supplier = bulk_data
+        .supplier
+        .clone()
+        .and_then(|s| normalize_optional_string(Some(s)));
+
+    let value_str = format!("{:.2}", bulk_data.value);
+
+    let mut inserted = 0;
+    let mut errors = Vec::<String>::new();
+    let mut inserted_ids = Vec::<Uuid>::new();
+
+    for plate_num in start..=end {
+        let plate = plate_num.to_string();
+        let patrimony_id = Uuid::new_v4();
+
+        let result = sqlx::query(
+            r#"
+            INSERT INTO patrimonies (
+                id,
+                plate,
+                name,
+                description,
+                acquisition_date,
+                value,
+                department,
+                status,
+                invoice_number,
+                commitment_number,
+                denf_se_number,
+                sector,
+                nf_issue_date,
+                supplier,
+                created_by,
+                is_vehicle
+            )
+            VALUES (
+                $1,
+                $2,
+                $3,
+                $4,
+                $5,
+                $6::numeric,
+                $7,
+                $8,
+                $9,
+                $10,
+                $11,
+                $12,
+                $13,
+                $14,
+                $15,
+                $16
+            )
+            ON CONFLICT (plate) DO NOTHING
+            "#
+        )
+        .bind(patrimony_id)
+        .bind(&plate)
+        .bind(&bulk_data.name)
+        .bind(&description)
+        .bind(bulk_data.acquisition_date)
+        .bind(&value_str)
+        .bind(&bulk_data.department)
+        .bind(&bulk_data.status)
+        .bind(&invoice_number)
+        .bind(&commitment_number)
+        .bind(&denf_se_number)
+        .bind(&sector)
+        .bind(bulk_data.nf_issue_date)
+        .bind(&supplier)
+        .bind(user.id)
+        .bind(bulk_data.is_vehicle)
+        .execute(pool.get_ref())
+        .await;
+
+        match result {
+            Ok(res) => {
+                if res.rows_affected() > 0 {
+                    inserted += 1;
+                    inserted_ids.push(patrimony_id);
+                } else {
+                    println!("⚠️ Patrimônio já existe: {}", plate);
+                }
+            }
+            Err(e) => {
+                let msg = format!(
+                    "Erro ao inserir patrimônio {}: {}",
+                    plate,
+                    e
+                );
+                eprintln!("❌ {}", msg);
+                errors.push(msg);
+            }
+        }
+    }
+
+    HttpResponse::Ok().json(serde_json::json!({
+        "inserted": inserted,
+        "total": total_to_insert,
+        "errors": errors,
+        "inserted_ids": inserted_ids
+    }))
+}
+
+// Endpoint para criar um documento fiscal para um patrimônio
+pub async fn create_fiscal_document(
+    pool: web::Data<PgPool>,
+    id: web::Path<Uuid>,
+    doc_data: web::Json<serde_json::Value>,
+    req: HttpRequest,
+) -> HttpResponse {
+    let _user = match auth_middleware(&req, pool.get_ref()).await {
+        Ok(Some(user)) => user,
+        Ok(None) => return HttpResponse::Unauthorized().json("Authentication required"),
+        Err(e) => return e,
+    };
+
+    let patrimony_id = id.into_inner();
+    
+    let invoice_number = doc_data.get("invoice_number").and_then(|v| v.as_str()).unwrap_or("");
+    let commitment_number = doc_data.get("commitment_number").and_then(|v| v.as_str()).unwrap_or("");
+    let issue_date: Option<NaiveDate> = doc_data.get("issue_date")
+        .and_then(|v| v.as_str())
+        .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
+
+    let doc_id = Uuid::new_v4();
+    
+    let result = sqlx::query(
+        "INSERT INTO fiscal_documents (id, patrimony_id, invoice_number, commitment_number, nf_issue_date) 
+         VALUES ($1, $2, $3, $4, $5)"
+    )
+    .bind(doc_id)
+    .bind(patrimony_id)
+    .bind(invoice_number)
+    .bind(commitment_number)
+    .bind(issue_date)
+    .execute(pool.get_ref())
+    .await;
+
+    match result {
+        Ok(_) => HttpResponse::Created().json(serde_json::json!({
+            "id": doc_id,
+            "message": "Documento fiscal criado com sucesso"
+        })),
+        Err(e) => {
+            eprintln!("Erro ao criar documento fiscal: {:?}", e);
+            HttpResponse::InternalServerError().json("Erro ao criar documento fiscal")
+        }
+    }
+}
+
+// Endpoint para upload da NF do documento fiscal
+pub async fn upload_fiscal_document_invoice(
+    pool: web::Data<PgPool>,
+    id: web::Path<Uuid>,
+    mut payload: Multipart,
+    req: HttpRequest,
+) -> HttpResponse {
+    let _user = match auth_middleware(&req, pool.get_ref()).await {
+        Ok(Some(user)) => user,
+        Ok(None) => return HttpResponse::Unauthorized().json("Authentication required"),
+        Err(e) => return e,
+    };
+
+    let fiscal_doc_id = id.into_inner();
+    
+    while let Ok(Some(mut field)) = payload.try_next().await {
+        let filename = field.content_disposition().get_filename().unwrap_or("document.pdf").to_string();
+        
+        let docs_dir = "./documents";
+        if !Path::new(docs_dir).exists() {
+            if let Err(_e) = fs::create_dir_all(docs_dir) {
+                return HttpResponse::InternalServerError().json("Erro ao criar diretório");
+            }
+        }
+
+        let file_extension = Path::new(&filename).extension().and_then(|ext| ext.to_str()).unwrap_or("pdf");
+        let new_filename = format!("fiscal_invoice_{}_{}.{}", fiscal_doc_id, Uuid::new_v4(), file_extension);
+        let filepath = format!("{}/{}", docs_dir, new_filename);
+
+        let mut file = match File::create(&filepath).await {
+            Ok(f) => f,
+            Err(_e) => return HttpResponse::InternalServerError().json("Erro ao salvar arquivo"),
+        };
+
+        while let Ok(Some(chunk)) = field.try_next().await {
+            if let Err(_e) = file.write_all(&chunk).await {
+                return HttpResponse::InternalServerError().json("Erro ao salvar dados");
+            }
+        }
+
+        let document_url = format!("/documents/{}", new_filename);
+        
+        let result = sqlx::query("UPDATE fiscal_documents SET invoice_file = $1 WHERE id = $2")
+            .bind(&document_url)
+            .bind(fiscal_doc_id)
+            .execute(pool.get_ref())
+            .await;
+
+        match result {
+            Ok(_) => return HttpResponse::Ok().json(serde_json::json!({
+                "message": "Arquivo enviado com sucesso",
+                "file_url": document_url
+            })),
+            Err(_e) => return HttpResponse::InternalServerError().json("Erro ao atualizar documento"),
+        }
+    }
+    
+    HttpResponse::BadRequest().json("Nenhum arquivo fornecido")
+}
+
+// Endpoint para upload do Empenho do documento fiscal
+pub async fn upload_fiscal_document_commitment(
+    pool: web::Data<PgPool>,
+    id: web::Path<Uuid>,
+    mut payload: Multipart,
+    req: HttpRequest,
+) -> HttpResponse {
+    let _user = match auth_middleware(&req, pool.get_ref()).await {
+        Ok(Some(user)) => user,
+        Ok(None) => return HttpResponse::Unauthorized().json("Authentication required"),
+        Err(e) => return e,
+    };
+
+    let fiscal_doc_id = id.into_inner();
+    
+    while let Ok(Some(mut field)) = payload.try_next().await {
+        let filename = field.content_disposition().get_filename().unwrap_or("document.pdf").to_string();
+        
+        let docs_dir = "./documents";
+        if !Path::new(docs_dir).exists() {
+            if let Err(_e) = fs::create_dir_all(docs_dir) {
+                return HttpResponse::InternalServerError().json("Erro ao criar diretório");
+            }
+        }
+
+        let file_extension = Path::new(&filename).extension().and_then(|ext| ext.to_str()).unwrap_or("pdf");
+        let new_filename = format!("fiscal_commitment_{}_{}.{}", fiscal_doc_id, Uuid::new_v4(), file_extension);
+        let filepath = format!("{}/{}", docs_dir, new_filename);
+
+        let mut file = match File::create(&filepath).await {
+            Ok(f) => f,
+            Err(_e) => return HttpResponse::InternalServerError().json("Erro ao salvar arquivo"),
+        };
+
+        while let Ok(Some(chunk)) = field.try_next().await {
+            if let Err(_e) = file.write_all(&chunk).await {
+                return HttpResponse::InternalServerError().json("Erro ao salvar dados");
+            }
+        }
+
+        let document_url = format!("/documents/{}", new_filename);
+        
+        let result = sqlx::query("UPDATE fiscal_documents SET commitment_file = $1 WHERE id = $2")
+            .bind(&document_url)
+            .bind(fiscal_doc_id)
+            .execute(pool.get_ref())
+            .await;
+
+        match result {
+            Ok(_) => return HttpResponse::Ok().json(serde_json::json!({
+                "message": "Arquivo enviado com sucesso",
+                "file_url": document_url
+            })),
+            Err(_e) => return HttpResponse::InternalServerError().json("Erro ao atualizar documento"),
+        }
+    }
+    
+    HttpResponse::BadRequest().json("Nenhum arquivo fornecido")
 }
 
 pub async fn restore_backup(
@@ -126,7 +530,6 @@ pub async fn restore_backup(
     req: HttpRequest,
     restore_data: web::Json<RestoreRequest>,
 ) -> HttpResponse {
-    // Verificar autenticação e permissões de admin
     let user = match auth_middleware(&req, pool.get_ref()).await {
         Ok(Some(user)) => {
             if user.role != "admin" {
@@ -141,18 +544,15 @@ pub async fn restore_backup(
     let backup_file = &restore_data.backup_file;
     let script_path = "./restore-backup.sh";
     
-    // Verificar se o script existe
     if !Path::new(script_path).exists() {
         return HttpResponse::InternalServerError().json("Script de restore não encontrado");
     }
 
-    // Verificar se o arquivo de backup existe
     let backup_path = format!("backups/{}", backup_file);
     if !Path::new(&backup_path).exists() {
         return HttpResponse::NotFound().json("Arquivo de backup não encontrado");
     }
 
-    // Executar o script
     let output = Command::new("bash")
         .arg(script_path)
         .arg(&backup_file)
@@ -190,8 +590,7 @@ pub async fn list_backups(
     pool: web::Data<PgPool>,
     req: HttpRequest,
 ) -> HttpResponse {
-    // Verificar autenticação e permissões de admin
-    let user = match auth_middleware(&req, pool.get_ref()).await {
+    let _user = match auth_middleware(&req, pool.get_ref()).await {
         Ok(Some(user)) => {
             if user.role != "admin" {
                 return HttpResponse::Forbidden().json("Admin access required");
@@ -231,7 +630,6 @@ pub async fn list_backups(
                                             
                                             let modified = match metadata.modified() {
                                                 Ok(time) => {
-                                                    // Converte SystemTime para DateTime<Utc> e formata como RFC3339
                                                     let datetime: chrono::DateTime<chrono::Utc> = time.into();
                                                     datetime.to_rfc3339()
                                                 },
@@ -252,7 +650,6 @@ pub async fn list_backups(
                 }
             }
             
-            // Ordenar por data de modificação (mais recente primeiro)
             backups.sort_by(|a, b| b["modified"].as_str().unwrap_or("").cmp(a["modified"].as_str().unwrap_or("")));
             
             HttpResponse::Ok().json(backups)
@@ -274,11 +671,9 @@ where
     Ok(opt.filter(|s| !s.is_empty()))
 }
 
-
 fn convert_to_f64(row: &PgRow, column: &str) -> f64 {
     println!("🔄 Convertendo coluna: {}", column);
     
-    // Primeiro tente como BigDecimal (para DECIMAL)
     if let Ok(bd) = row.try_get::<BigDecimal, _>(column) {
         println!("✅ Valor como BigDecimal: {}", bd);
         if let Ok(val) = bd.to_string().parse::<f64>() {
@@ -287,7 +682,6 @@ fn convert_to_f64(row: &PgRow, column: &str) -> f64 {
         }
     }
     
-    // Tente como Option<BigDecimal>
     if let Ok(Some(bd)) = row.try_get::<Option<BigDecimal>, _>(column) {
         println!("✅ Valor como Option<BigDecimal>: {}", bd);
         if let Ok(val) = bd.to_string().parse::<f64>() {
@@ -296,19 +690,16 @@ fn convert_to_f64(row: &PgRow, column: &str) -> f64 {
         }
     }
     
-    // Tente como f64 (float8) - fallback
     if let Ok(val) = row.try_get::<f64, _>(column) {
         println!("✅ Valor como f64: {}", val);
         return val;
     }
     
-    // Tente como Option<f64>
     if let Ok(Some(val)) = row.try_get::<Option<f64>, _>(column) {
         println!("✅ Valor como Option<f64>: {}", val);
         return val;
     }
     
-    // Tente como String (fallback)
     if let Ok(val_str) = row.try_get::<String, _>(column) {
         println!("✅ Valor como String: {}", val_str);
         if let Ok(val) = val_str.parse::<f64>() {
@@ -317,7 +708,6 @@ fn convert_to_f64(row: &PgRow, column: &str) -> f64 {
         }
     }
     
-    // Tente como Option<String>
     if let Ok(Some(val_str)) = row.try_get::<Option<String>, _>(column) {
         println!("✅ Valor como Option<String>: {:?}", val_str);
         if let Ok(val) = val_str.parse::<f64>() {
@@ -329,7 +719,6 @@ fn convert_to_f64(row: &PgRow, column: &str) -> f64 {
     println!("❌ Não foi possível converter o valor da coluna: {}", column);
     0.0
 }
-
 
 fn get_image_url(row: &PgRow) -> Option<String> {
     match row.try_get::<Option<String>, _>("image_url") {
@@ -681,7 +1070,6 @@ pub async fn upload_image(
     mut payload: Multipart,
     req: HttpRequest,
 ) -> HttpResponse {
-    // Verificar autenticação
     let _user = match auth_middleware(&req, pool.get_ref()).await {
         Ok(Some(user)) => user,
         Ok(None) => return HttpResponse::Unauthorized().json("Authentication required"),
@@ -691,7 +1079,6 @@ pub async fn upload_image(
     let patrimony_id = id.into_inner();
     println!("📤 Upload de imagem para patrimônio: {}", patrimony_id);
 
-    // Verificar se o patrimônio existe
     let patrimony_exists = match sqlx::query("SELECT id FROM patrimonies WHERE id = $1")
         .bind(patrimony_id)
         .fetch_optional(pool.get_ref())
@@ -709,12 +1096,10 @@ pub async fn upload_image(
         return HttpResponse::NotFound().json("Patrimônio não encontrado");
     }
 
-    // Processar o upload
     while let Ok(Some(mut field)) = payload.try_next().await {
         let filename = field.content_disposition().get_filename().unwrap_or("image.jpg").to_string();
         println!("📁 Arquivo: {}", filename);
 
-        // Criar diretório se não existir
         let upload_dir = "./uploads";
         if !Path::new(upload_dir).exists() {
             if let Err(e) = fs::create_dir_all(upload_dir) {
@@ -723,12 +1108,10 @@ pub async fn upload_image(
             }
         }
 
-        // Gerar nome único
         let file_extension = Path::new(&filename).extension().and_then(|ext| ext.to_str()).unwrap_or("jpg");
         let new_filename = format!("{}.{}", Uuid::new_v4(), file_extension);
         let filepath = format!("{}/{}", upload_dir, new_filename);
 
-        // Salvar arquivo
         let mut file = match File::create(&filepath).await {
             Ok(f) => f,
             Err(e) => {
@@ -744,7 +1127,6 @@ pub async fn upload_image(
             }
         }
 
-        // Atualizar banco
         let image_url = format!("/uploads/{}", new_filename);
         let result = sqlx::query("UPDATE patrimonies SET image_url = $1, updated_at = NOW() WHERE id = $2")
             .bind(&image_url)
@@ -776,7 +1158,6 @@ pub async fn upload_document(
     mut payload: Multipart,
     req: HttpRequest,
 ) -> HttpResponse {
-    // Verificar autenticação
     let _user = match auth_middleware(&req, pool.get_ref()).await {
         Ok(Some(user)) => user,
         Ok(None) => return HttpResponse::Unauthorized().json("Authentication required"),
@@ -786,7 +1167,6 @@ pub async fn upload_document(
     let (patrimony_id, doc_type) = path.into_inner();
     println!("📤 Upload de documento {} para patrimônio: {}", doc_type, patrimony_id);
 
-    // Verificar se o patrimônio existe
     let patrimony_exists = match sqlx::query("SELECT id FROM patrimonies WHERE id = $1")
         .bind(patrimony_id)
         .fetch_optional(pool.get_ref())
@@ -804,18 +1184,15 @@ pub async fn upload_document(
         return HttpResponse::NotFound().json("Patrimônio não encontrado");
     }
 
-    // Tipos de documento permitidos
     let allowed_types = vec!["invoice", "commitment", "denf"];
     if !allowed_types.contains(&doc_type.as_str()) {
         return HttpResponse::BadRequest().json("Tipo de documento inválido");
     }
 
-    // Processar o upload do documento
     while let Ok(Some(mut field)) = payload.try_next().await {
         let filename = field.content_disposition().get_filename().unwrap_or("document.pdf").to_string();
         println!("📁 Arquivo: {}", filename);
 
-        // Criar diretório de documentos se não existir
         let docs_dir = "./documents";
         if !Path::new(docs_dir).exists() {
             if let Err(e) = fs::create_dir_all(docs_dir) {
@@ -824,12 +1201,10 @@ pub async fn upload_document(
             }
         }
 
-        // Gerar nome único para o arquivo
         let file_extension = Path::new(&filename).extension().and_then(|ext| ext.to_str()).unwrap_or("pdf");
         let new_filename = format!("{}_{}.{}", doc_type, Uuid::new_v4(), file_extension);
         let filepath = format!("{}/{}", docs_dir, new_filename);
 
-        // Salvar arquivo
         let mut file = match File::create(&filepath).await {
             Ok(f) => f,
             Err(e) => {
@@ -847,7 +1222,6 @@ pub async fn upload_document(
             }
         }
 
-        // Atualizar o patrimônio com a referência do documento
         let document_url = format!("/documents/{}", new_filename);
         let column_name = match doc_type.as_str() {
             "invoice" => "invoice_file",
@@ -903,7 +1277,6 @@ pub async fn upload_document(
     HttpResponse::BadRequest().json("Nenhum documento fornecido")
 }
 
-// Adicione esta função para servir arquivos estáticos
 pub async fn serve_image(filename: web::Path<String>) -> HttpResponse {
     let filepath = format!("./uploads/{}", filename);
     println!("📁 Servindo imagem: {}", filepath);
@@ -946,7 +1319,6 @@ pub async fn serve_document(filename: web::Path<String>) -> HttpResponse {
     }
 }
 
-
 pub async fn health_check() -> HttpResponse {
     HttpResponse::Ok().json(serde_json::json!({
         "status": "ok",
@@ -954,12 +1326,12 @@ pub async fn health_check() -> HttpResponse {
     }))
 }
 
+// ==================== GET PATRIMONIES ====================
 pub async fn get_patrimonies(
     pool: web::Data<PgPool>,
     query: web::Query<DepartmentQuery>,
     req: HttpRequest,
 ) -> HttpResponse {
-    // Verificar autenticação
     let _user = match auth_middleware(&req, pool.get_ref()).await {
         Ok(Some(user)) => user,
         Ok(None) => return HttpResponse::Unauthorized().json("Authentication required"),
@@ -974,115 +1346,174 @@ pub async fn get_patrimonies(
     let name_filter = query.name.clone();
     let min_value_filter = query.min_value;
     let max_value_filter = query.max_value;
-    let sector_filter = query.sector.clone(); // ✅ NOVO FILTRO
+    let sector_filter = query.sector.clone();
+    let is_vehicle_filter = query.is_vehicle;
     
-    // ✅ ATUALIZADO: Incluir os novos campos na query
-    let mut sql = "SELECT id, plate, name, description, acquisition_date, value, department, status, invoice_number, commitment_number, denf_se_number, invoice_file, commitment_file, denf_se_file, image_url, sector, nf_issue_date, supplier, is_vehicle, created_by, created_at, updated_at FROM patrimonies".to_string();
+    // ✅ MODIFICADO: Adicionado LEFT JOIN com fleets e seleção dos campos
+    let mut sql = r#"
+        SELECT 
+            p.id, p.plate, p.name, p.description, p.acquisition_date, p.value, 
+            p.department, p.status, p.invoice_number, p.commitment_number, 
+            p.denf_se_number, p.invoice_file, p.commitment_file, p.denf_se_file, 
+            p.image_url, p.sector, p.nf_issue_date, p.supplier, p.is_vehicle, 
+            p.created_by, p.created_at, p.updated_at,
+            f.fleet_number,
+            f.notes as fleet_notes
+        FROM patrimonies p
+        LEFT JOIN fleets f ON f.patrimony_id = p.id
+    "#.to_string();
+    
     let mut params: Vec<String> = Vec::new();
     let mut where_clauses = Vec::new();
     let mut param_count = 1;
     
-    // Adicionar filtros com contador de parâmetros dinâmico
-    // Adicionar filtros com contador de parâmetros dinâmico
+    // ==================== FILTROS ====================
+    
+    // ✅ FILTRO POR DEPARTAMENTO (BUSCA EXATA)
     if let Some(ref dept) = department_filter {
-        where_clauses.push(format!("department = ${}", param_count));
-        params.push(dept.clone());
-        param_count += 1;
+        if !dept.is_empty() {
+            where_clauses.push(format!("p.department = ${}", param_count));
+            params.push(dept.clone());
+            param_count += 1;
+        }
     }
 
+    // ✅ FILTRO POR SETOR (BUSCA EXATA)
+    if let Some(ref sector) = sector_filter {
+        if !sector.is_empty() {
+            where_clauses.push(format!("p.sector = ${}", param_count));
+            params.push(sector.clone());
+            param_count += 1;
+        }
+    }
+
+    // ✅ FILTRO POR STATUS
     if let Some(ref status) = status_filter {
-        where_clauses.push(format!("status = ${}", param_count));
-        params.push(status.clone());
-        param_count += 1;
+        if !status.is_empty() {
+            where_clauses.push(format!("p.status = ${}", param_count));
+            params.push(status.clone());
+            param_count += 1;
+        }
     }
 
+    // ✅ FILTRO POR PLACA (BUSCA PARCIAL)
     if let Some(ref plate) = plate_filter {
-        where_clauses.push(format!("plate ILIKE ${}", param_count));
-        params.push(format!("%{}%", plate));
-        param_count += 1;
+        if !plate.is_empty() {
+            where_clauses.push(format!("p.plate ILIKE ${}", param_count));
+            params.push(format!("%{}%", plate));
+            param_count += 1;
+        }
     }
 
+    // ✅ FILTRO POR NOME (BUSCA PARCIAL)
     if let Some(ref name) = name_filter {
-        where_clauses.push(format!("name ILIKE ${}", param_count));
-        params.push(format!("%{}%", name));
-        param_count += 1;
+        if !name.is_empty() {
+            where_clauses.push(format!("p.name ILIKE ${}", param_count));
+            params.push(format!("%{}%", name));
+            param_count += 1;
+        }
     }
 
+    // ✅ FILTRO POR VALOR MÍNIMO
     if let Some(min_value) = min_value_filter {
-        where_clauses.push(format!("value >= ${}", param_count));
+        where_clauses.push(format!("p.value >= ${}", param_count));
         params.push(min_value.to_string());
         param_count += 1;
     }
 
+    // ✅ FILTRO POR VALOR MÁXIMO
     if let Some(max_value) = max_value_filter {
-        where_clauses.push(format!("value <= ${}", param_count));
+        where_clauses.push(format!("p.value <= ${}", param_count));
         params.push(max_value.to_string());
         param_count += 1;
     }
 
-    // ✅ FILTRO POR SETOR
-    if let Some(ref sector) = sector_filter {
-        where_clauses.push(format!("sector = ${}", param_count));
-        params.push(sector.clone());
-        param_count += 1;
-    }
-
-    // ✅ NOVO FILTRO POR DESCRIÇÃO
+    // ✅ FILTRO POR DESCRIÇÃO (BUSCA PARCIAL)
     if let Some(ref desc) = query.description {
-        where_clauses.push(format!("description ILIKE ${}", param_count));
-        params.push(format!("%{}%", desc));
-        param_count += 1;
+        if !desc.is_empty() {
+            where_clauses.push(format!("p.description ILIKE ${}", param_count));
+            params.push(format!("%{}%", desc));
+            param_count += 1;
+        }
     }
 
-    // ✅ NOVO FILTRO POR NÚMERO DA NOTA FISCAL
+    // ✅ FILTRO POR NÚMERO DA NOTA FISCAL (BUSCA PARCIAL)
     if let Some(ref inv) = query.invoice_number {
-        where_clauses.push(format!(
-            "(invoice_number ILIKE ${0} OR EXISTS(SELECT 1 FROM fiscal_documents f WHERE f.patrimony_id = patrimonies.id AND f.invoice_number ILIKE ${0}))",
-            param_count
-        ));
-        params.push(format!("%{}%", inv));
-        param_count += 1;
+        if !inv.is_empty() {
+            where_clauses.push(format!(
+                "(p.invoice_number ILIKE ${0} OR EXISTS(SELECT 1 FROM fiscal_documents f WHERE f.patrimony_id = p.id AND f.invoice_number ILIKE ${0}))",
+                param_count
+            ));
+            params.push(format!("%{}%", inv));
+            param_count += 1;
+        }
     }
 
     // ✅ FILTRO POR VEÍCULOS
-    if let Some(is_vehicle) = query.is_vehicle {
-        where_clauses.push(format!("is_vehicle = ${}::boolean", param_count));
+    if let Some(is_vehicle) = is_vehicle_filter {
+        where_clauses.push(format!("p.is_vehicle = ${}::boolean", param_count));
         params.push(is_vehicle.to_string());
         param_count += 1;
     }
 
-    // ✅ NOVO FILTRO POR NÚMERO DO EMPENHO
+    // ✅ FILTRO POR NÚMERO DO EMPENHO (BUSCA PARCIAL)
     if let Some(ref comm) = query.commitment_number {
-        where_clauses.push(format!(
-            "(commitment_number ILIKE ${0} OR EXISTS(SELECT 1 FROM fiscal_documents f WHERE f.patrimony_id = patrimonies.id AND f.commitment_number ILIKE ${0}))",
-            param_count
-        ));
-        params.push(format!("%{}%", comm));
-        param_count += 1;
+        if !comm.is_empty() {
+            where_clauses.push(format!(
+                "(p.commitment_number ILIKE ${0} OR EXISTS(SELECT 1 FROM fiscal_documents f WHERE f.patrimony_id = p.id AND f.commitment_number ILIKE ${0}))",
+                param_count
+            ));
+            params.push(format!("%{}%", comm));
+            param_count += 1;
+        }
     }
 
-    // Dentro da função get_patrimonies, após os outros filtros
+    // ✅ FILTRO POR FROTA (BUSCA PARCIAL) - NOVO!
+    if let Some(ref fleet) = query.fleet_number {
+        if !fleet.is_empty() {
+            where_clauses.push(format!(
+                "EXISTS(SELECT 1 FROM fleets f WHERE f.patrimony_id = p.id AND f.fleet_number ILIKE ${})",
+                param_count
+            ));
+            params.push(format!("%{}%", fleet));
+            param_count += 1;
+        }
+    }
+
+    // ✅ FILTRO POR OBSERVAÇÃO DA FROTA (BUSCA PARCIAL) - NOVO!
+    if let Some(ref fleet_notes) = query.fleet_notes {
+        if !fleet_notes.is_empty() {
+            where_clauses.push(format!(
+                "EXISTS(SELECT 1 FROM fleets f WHERE f.patrimony_id = p.id AND f.notes ILIKE ${})",
+                param_count
+            ));
+            params.push(format!("%{}%", fleet_notes));
+            param_count += 1;
+        }
+    }
+
+    // ✅ BUSCA GLOBAL - busca em department E sector (BUSCA PARCIAL)
     if let Some(ref search) = query.search {
         if !search.is_empty() {
             where_clauses.push(format!(
-                "(plate ILIKE ${} OR name ILIKE ${} OR description ILIKE ${} OR department ILIKE ${} OR sector ILIKE ${} OR invoice_number ILIKE ${} OR commitment_number ILIKE ${})",
-                param_count, param_count, param_count, param_count, param_count, param_count, param_count
+                "(p.plate ILIKE ${} OR p.name ILIKE ${} OR p.description ILIKE ${} OR p.department ILIKE ${} OR p.sector ILIKE ${} OR p.invoice_number ILIKE ${} OR p.commitment_number ILIKE ${} OR EXISTS(SELECT 1 FROM fleets f WHERE f.patrimony_id = p.id AND f.fleet_number ILIKE ${}))",
+                param_count, param_count, param_count, param_count, param_count, param_count, param_count, param_count
             ));
             let search_pattern = format!("%{}%", search);
-            for _ in 0..7 {
+            for _ in 0..8 {
                 params.push(search_pattern.clone());
                 param_count += 1;
             }
         }
     }
 
-    // Agora sim, adicionar WHERE se houver cláusulas
     if !where_clauses.is_empty() {
         sql.push_str(" WHERE ");
         sql.push_str(&where_clauses.join(" AND "));
     }
 
-    sql.push_str(" ORDER BY created_at DESC");
+    sql.push_str(" ORDER BY p.created_at DESC");
+
     println!("🔍 SQL gerado: {}", sql);
     println!("📊 Parâmetros: {:?}", params);
 
@@ -1091,7 +1522,6 @@ pub async fn get_patrimonies(
             .fetch_all(pool.get_ref())
             .await
     } else {
-        // Com filtros - usando query_as com parâmetros dinâmicos
         let mut query_builder = sqlx::query(&sql);
         for param in &params {
             query_builder = query_builder.bind(param);
@@ -1139,13 +1569,16 @@ pub async fn get_patrimonies(
             denf_se_file,
             fiscal_documents: fiscal_documents_map.get(&patrimony_id).cloned(),
             image_url,
-            sector: row.get("sector"),           // ✅ NOVO CAMPO
-            nf_issue_date: row.get("nf_issue_date"), // ✅ NOVO CAMPO
-            supplier: row.get("supplier"),       // ✅ NOVO CAMPO
-            is_vehicle: row.get("is_vehicle"),   // ✅ NOVO CAMPO
+            sector: row.get("sector"),
+            nf_issue_date: row.get("nf_issue_date"),
+            supplier: row.get("supplier"),
+            is_vehicle: row.get("is_vehicle"),
             created_by: row.get("created_by"),
             created_at: row.get("created_at"),
             updated_at: row.get("updated_at"),
+            // ✅ NOVOS CAMPOS DA FROTA
+            fleet_number: row.get("fleet_number"),
+            fleet_notes: row.get("fleet_notes"),
         }
     }).collect::<Vec<Patrimony>>();
 
@@ -1153,12 +1586,12 @@ pub async fn get_patrimonies(
     HttpResponse::Ok().json(patrimonies)
 }
 
+// ==================== GET PATRIMONY ====================
 pub async fn get_patrimony(
     pool: web::Data<PgPool>,
     id: web::Path<Uuid>,
     req: HttpRequest,
 ) -> HttpResponse {
-    // Verificar autenticação
     let _user = match auth_middleware(&req, pool.get_ref()).await {
         Ok(Some(user)) => user,
         Ok(None) => return HttpResponse::Unauthorized().json("Authentication required"),
@@ -1167,8 +1600,21 @@ pub async fn get_patrimony(
 
     let patrimony_id = id.into_inner();
     
+    // ✅ MODIFICADO: Adicionado LEFT JOIN com fleets
     let row_result = sqlx::query(
-        "SELECT id, plate, name, description, acquisition_date, value, department, status, invoice_number, commitment_number, denf_se_number, invoice_file, commitment_file, denf_se_file, image_url, sector, nf_issue_date, supplier, is_vehicle, created_by, created_at, updated_at FROM patrimonies WHERE id = $1"
+        r#"
+        SELECT 
+            p.id, p.plate, p.name, p.description, p.acquisition_date, p.value, 
+            p.department, p.status, p.invoice_number, p.commitment_number, 
+            p.denf_se_number, p.invoice_file, p.commitment_file, p.denf_se_file, 
+            p.image_url, p.sector, p.nf_issue_date, p.supplier, p.is_vehicle, 
+            p.created_by, p.created_at, p.updated_at,
+            f.fleet_number,
+            f.notes as fleet_notes
+        FROM patrimonies p
+        LEFT JOIN fleets f ON f.patrimony_id = p.id
+        WHERE p.id = $1
+        "#
     )
     .bind(patrimony_id)
     .fetch_one(pool.get_ref())
@@ -1215,24 +1661,27 @@ pub async fn get_patrimony(
         denf_se_file,
         fiscal_documents,
         image_url,
-        sector: row.get("sector"),           // ✅ NOVO CAMPO
-        nf_issue_date: row.get("nf_issue_date"), // ✅ NOVO CAMPO
-        supplier: row.get("supplier"),       // ✅ NOVO CAMPO
-        is_vehicle: row.get("is_vehicle"),   // ✅ NOVO CAMPO
+        sector: row.get("sector"),
+        nf_issue_date: row.get("nf_issue_date"),
+        supplier: row.get("supplier"),
+        is_vehicle: row.get("is_vehicle"),
         created_by: row.get("created_by"),
         created_at: row.get("created_at"),
         updated_at: row.get("updated_at"),
+        // ✅ NOVOS CAMPOS DA FROTA
+        fleet_number: row.get("fleet_number"),
+        fleet_notes: row.get("fleet_notes"),
     };
 
     HttpResponse::Ok().json(patrimony)
 }
 
+// ==================== CREATE PATRIMONY ====================
 pub async fn create_patrimony(
     pool: web::Data<PgPool>,
     patrimony: web::Json<CreatePatrimony>,
     req: HttpRequest,
 ) -> HttpResponse {
-    // Verificar autenticação
     let user = match auth_middleware(&req, pool.get_ref()).await {
         Ok(Some(user)) => {
             println!("✅ Usuário autenticado: {}", user.username);
@@ -1248,7 +1697,6 @@ pub async fn create_patrimony(
         },
     };
 
-    // Validações básicas
     if patrimony.plate.trim().is_empty() {
         return HttpResponse::BadRequest().json("Plate é obrigatório");
     }
@@ -1308,11 +1756,12 @@ pub async fn create_patrimony(
                 }
             }
 
-            // Buscar o patrimônio completo criado
             let new_patrimony = sqlx::query(
                 "SELECT id, plate, name, description, acquisition_date, value, department, status, 
                         invoice_number, commitment_number, denf_se_number, invoice_file, commitment_file, 
-                        denf_se_file, image_url, sector, nf_issue_date, supplier, is_vehicle, created_by, created_at, updated_at 
+                        denf_se_file, image_url, sector, nf_issue_date, supplier, is_vehicle, created_by, created_at, updated_at,
+                        (SELECT fleet_number FROM fleets WHERE patrimony_id = $1 LIMIT 1) as fleet_number,
+                        (SELECT notes FROM fleets WHERE patrimony_id = $1 LIMIT 1) as fleet_notes
                  FROM patrimonies WHERE id = $1"
             )
             .bind(record_id)
@@ -1343,6 +1792,9 @@ pub async fn create_patrimony(
                     created_by: row.get("created_by"),
                     created_at: row.get("created_at"),
                     updated_at: row.get("updated_at"),
+                    // ✅ NOVOS CAMPOS DA FROTA
+                    fleet_number: row.get("fleet_number"),
+                    fleet_notes: row.get("fleet_notes"),
                 }
             })
             .fetch_one(pool.get_ref())
@@ -1379,13 +1831,13 @@ pub async fn create_patrimony(
     }
 }
 
+// ==================== UPDATE PATRIMONY ====================
 pub async fn update_patrimony(
     pool: web::Data<PgPool>,
     id: web::Path<Uuid>,
     patrimony: web::Json<UpdatePatrimony>,
     req: HttpRequest,
 ) -> HttpResponse {
-    // Verificar autenticação
     let _user = match auth_middleware(&req, pool.get_ref()).await {
         Ok(Some(user)) => user,
         Ok(None) => return HttpResponse::Unauthorized().json("Authentication required"),
@@ -1396,7 +1848,6 @@ pub async fn update_patrimony(
     
     println!("🔄 Iniciando update do patrimônio: {}", patrimony_id);
 
-    // Primeiro buscar o patrimônio existente
     let existing_result = sqlx::query(
         "SELECT id, plate, name, description, acquisition_date, value, department, status, 
                 invoice_number, commitment_number, denf_se_number, sector, nf_issue_date, supplier, is_vehicle 
@@ -1416,7 +1867,6 @@ pub async fn update_patrimony(
 
     let existing_row = existing_result.unwrap();
     
-    // ✅ CORREÇÃO CRÍTICA: Obter valores existentes corretamente
     let existing_plate: String = existing_row.get("plate");
     let existing_name: String = existing_row.get("name");
     let existing_description: String = existing_row.get("description");
@@ -1425,51 +1875,14 @@ pub async fn update_patrimony(
     let existing_department: String = existing_row.get("department");
     let existing_status: String = existing_row.get("status");
     
-    // ✅ CORREÇÃO: Para campos Option, usar get diretamente
     let existing_invoice_number: Option<String> = normalize_optional_string(existing_row.get("invoice_number"));
     let existing_commitment_number: Option<String> = normalize_optional_string(existing_row.get("commitment_number"));
     let existing_denf_se_number: Option<String> = normalize_optional_string(existing_row.get("denf_se_number"));
-    
-    // ✅ CORREÇÃO: Para os NOVOS CAMPOS Option
     let existing_sector: Option<String> = normalize_optional_string(existing_row.get("sector"));
     let existing_nf_issue_date: Option<NaiveDate> = existing_row.get("nf_issue_date");
     let existing_supplier: Option<String> = normalize_optional_string(existing_row.get("supplier"));
-    // ✅ NOVO CAMPO booleano
     let existing_is_vehicle: bool = existing_row.get("is_vehicle");
 
-    // 🔍 LOGS DETALHADOS PARA DEBUG
-    println!("🔄 Update - Valores existentes:");
-    println!("  Plate: {}", existing_plate);
-    println!("  Name: {}", existing_name);
-    println!("  Description: {}", existing_description);
-    println!("  Acquisition Date: {}", existing_acquisition_date);
-    println!("  Value: {}", existing_value);
-    println!("  Department: {}", existing_department);
-    println!("  Status: {}", existing_status);
-    println!("  Invoice Number: {:?}", existing_invoice_number);
-    println!("  Commitment Number: {:?}", existing_commitment_number);
-    println!("  DENF/SE Number: {:?}", existing_denf_se_number);
-    println!("  Sector: {:?}", existing_sector);
-    println!("  NF Issue Date: {:?}", existing_nf_issue_date);
-    println!("  Supplier: {:?}", existing_supplier);
-
-    println!("🔄 Update - Novos valores recebidos:");
-    println!("  Plate: {:?}", patrimony.plate);
-    println!("  Name: {:?}", patrimony.name);
-    println!("  Description: {:?}", patrimony.description);
-    println!("  Acquisition Date: {:?}", patrimony.acquisition_date);
-    println!("  Value: {:?}", patrimony.value);
-    println!("  Department: {:?}", patrimony.department);
-    println!("  Status: {:?}", patrimony.status);
-    println!("  Invoice Number: {:?}", patrimony.invoice_number);
-    println!("  Commitment Number: {:?}", patrimony.commitment_number);
-    println!("  DENF/SE Number: {:?}", patrimony.denf_se_number);
-    println!("  Sector: {:?}", patrimony.sector);
-    println!("  NF Issue Date: {:?}", patrimony.nf_issue_date);
-    println!("  Supplier: {:?}", patrimony.supplier);
-    println!("  Is vehicle: {:?}", patrimony.is_vehicle);
-
-    // ✅ CORREÇÃO: Usar valores existentes ou novos valores fornecidos CORRETAMENTE
     let plate = patrimony.plate.as_ref().unwrap_or(&existing_plate);
     let name = patrimony.name.as_ref().unwrap_or(&existing_name);
     let description = patrimony.description.as_ref().unwrap_or(&existing_description);
@@ -1478,7 +1891,6 @@ pub async fn update_patrimony(
     let department = patrimony.department.as_ref().unwrap_or(&existing_department);
     let status = patrimony.status.as_ref().unwrap_or(&existing_status);
     
-    // ✅ CORREÇÃO: Para campos Option, usar or() ou as_ref().or()
     let mut invoice_number = patrimony.invoice_number.clone().and_then(|s| normalize_optional_string(Some(s))).or(existing_invoice_number.clone());
     let mut commitment_number = patrimony.commitment_number.clone().and_then(|s| normalize_optional_string(Some(s))).or(existing_commitment_number.clone());
     let denf_se_number = patrimony.denf_se_number.clone().and_then(|s| normalize_optional_string(Some(s))).or(existing_denf_se_number.clone());
@@ -1490,31 +1902,11 @@ pub async fn update_patrimony(
         }
     }
     
-    // ✅ CORREÇÃO: Para os NOVOS CAMPOS Option
     let sector = patrimony.sector.clone().and_then(|s| normalize_optional_string(Some(s))).or(existing_sector.clone());
     let nf_issue_date = patrimony.nf_issue_date.or(existing_nf_issue_date);
     let supplier = patrimony.supplier.clone().and_then(|s| normalize_optional_string(Some(s))).or(existing_supplier.clone());
     let is_vehicle = patrimony.is_vehicle.unwrap_or(existing_is_vehicle);
 
-    // 🔍 LOG DOS VALORES FINAIS QUE SERÃO USADOS
-    println!("🔄 Update - Valores finais para atualização:");
-    println!("  Plate: {}", plate);
-    println!("  Name: {}", name);
-    println!("  Description: {}", description);
-    println!("  Acquisition Date: {}", acquisition_date);
-    println!("  Value: {}", value);
-    println!("  Department: {}", department);
-    println!("  Status: {}", status);
-    println!("  Invoice Number: {:?}", invoice_number);
-    println!("  Commitment Number: {:?}", commitment_number);
-    println!("  DENF/SE Number: {:?}", denf_se_number);
-    println!("  Sector: {:?}", sector);
-    println!("  NF Issue Date: {:?}", nf_issue_date);
-    println!("  Supplier: {:?}", supplier);
-    println!("  Is vehicle: {}", is_vehicle);
-    println!("  Is vehicle: {}", existing_is_vehicle);
-
-    // ✅ CORREÇÃO: Query SQL com todos os campos
     let result = sqlx::query(
         "UPDATE patrimonies SET 
             plate = $1, name = $2, description = $3, acquisition_date = $4, value = $5, 
@@ -1564,11 +1956,12 @@ pub async fn update_patrimony(
                     return HttpResponse::InternalServerError().json("Erro ao atualizar documentos fiscais");
                 }
 
-                // Buscar o patrimônio atualizado
                 let updated_patrimony = sqlx::query(
                     "SELECT id, plate, name, description, acquisition_date, value, department, status, 
                             invoice_number, commitment_number, denf_se_number, invoice_file, commitment_file, 
-                            denf_se_file, image_url, sector, nf_issue_date, supplier, is_vehicle, created_by, created_at, updated_at 
+                            denf_se_file, image_url, sector, nf_issue_date, supplier, is_vehicle, created_by, created_at, updated_at,
+                            (SELECT fleet_number FROM fleets WHERE patrimony_id = $1 LIMIT 1) as fleet_number,
+                            (SELECT notes FROM fleets WHERE patrimony_id = $1 LIMIT 1) as fleet_notes
                      FROM patrimonies WHERE id = $1"
                 )
                 .bind(patrimony_id)
@@ -1599,6 +1992,9 @@ pub async fn update_patrimony(
                         created_by: row.get("created_by"),
                         created_at: row.get("created_at"),
                         updated_at: row.get("updated_at"),
+                        // ✅ NOVOS CAMPOS DA FROTA
+                        fleet_number: row.get("fleet_number"),
+                        fleet_notes: row.get("fleet_notes"),
                     }
                 })
                 .fetch_one(pool.get_ref())
@@ -1639,12 +2035,12 @@ pub async fn update_patrimony(
     }
 }
 
+// ==================== DELETE PATRIMONY ====================
 pub async fn delete_patrimony(
     pool: web::Data<PgPool>,
     id: web::Path<Uuid>,
     req: HttpRequest,
 ) -> HttpResponse {
-    // Verificar autenticação
     let _user = match auth_middleware(&req, pool.get_ref()).await {
         Ok(Some(user)) => user,
         Ok(None) => return HttpResponse::Unauthorized().json("Authentication required"),
@@ -1675,12 +2071,11 @@ pub async fn delete_patrimony(
     }
 }
 
-// ... (todo o código existente que você mostrou) ...
+// ==================== DEBUG IMAGES ====================
 pub async fn debug_images(
     pool: web::Data<PgPool>,
     req: HttpRequest,
 ) -> HttpResponse {
-    // Verificar autenticação
     let _user = match auth_middleware(&req, pool.get_ref()).await {
         Ok(Some(user)) => user,
         Ok(None) => return HttpResponse::Unauthorized().json("Authentication required"),
@@ -1721,12 +2116,12 @@ pub async fn debug_images(
     }
 }
 
+// ==================== GET STATS ====================
 pub async fn get_stats(
     pool: web::Data<PgPool>,
     query: web::Query<DepartmentQuery>,
     req: HttpRequest,
 ) -> HttpResponse {
-    // Verificar autenticação
     let _user = match auth_middleware(&req, pool.get_ref()).await {
         Ok(Some(user)) => user,
         Ok(None) => return HttpResponse::Unauthorized().json("Authentication required"),
@@ -1854,12 +2249,12 @@ pub async fn get_stats(
     })
 }
 
+// ==================== GET PATRIMONIES BY DEPARTMENT ====================
 pub async fn get_patrimonies_by_department(
     department: web::Path<String>,
     pool: web::Data<PgPool>,
     req: HttpRequest,
 ) -> HttpResponse {
-    // Verificar autenticação
     let _user = match auth_middleware(&req, pool.get_ref()).await {
         Ok(Some(user)) => user,
         Ok(None) => return HttpResponse::Unauthorized().json("Authentication required"),
@@ -1869,7 +2264,12 @@ pub async fn get_patrimonies_by_department(
     let department_filter = department.into_inner();
     
     let result = sqlx::query(
-        "SELECT id, plate, name, description, acquisition_date, value, department, status, invoice_number, commitment_number, denf_se_number, invoice_file, commitment_file, denf_se_file, image_url, sector, nf_issue_date, supplier, is_vehicle, created_by, created_at, updated_at FROM patrimonies WHERE department = $1 ORDER BY created_at DESC"
+        "SELECT id, plate, name, description, acquisition_date, value, department, status, 
+                invoice_number, commitment_number, denf_se_number, invoice_file, commitment_file, 
+                denf_se_file, image_url, sector, nf_issue_date, supplier, is_vehicle, created_by, created_at, updated_at,
+                (SELECT fleet_number FROM fleets WHERE patrimony_id = patrimonies.id LIMIT 1) as fleet_number,
+                (SELECT notes FROM fleets WHERE patrimony_id = patrimonies.id LIMIT 1) as fleet_notes
+         FROM patrimonies WHERE department = $1 ORDER BY created_at DESC"
     )
     .bind(&department_filter)
     .map(|row: PgRow| {
@@ -1892,13 +2292,16 @@ pub async fn get_patrimonies_by_department(
             denf_se_file,
             fiscal_documents: None,
             image_url,
-            sector: row.get("sector"),           // ✅ NOVO CAMPO
-            nf_issue_date: row.get("nf_issue_date"), // ✅ NOVO CAMPO
-            supplier: row.get("supplier"),       // ✅ NOVO CAMPO
-            is_vehicle: row.get("is_vehicle"),   // ✅ NOVO CAMPO
+            sector: row.get("sector"),
+            nf_issue_date: row.get("nf_issue_date"),
+            supplier: row.get("supplier"),
+            is_vehicle: row.get("is_vehicle"),
             created_by: row.get("created_by"),
             created_at: row.get("created_at"),
             updated_at: row.get("updated_at"),
+            // ✅ NOVOS CAMPOS DA FROTA
+            fleet_number: row.get("fleet_number"),
+            fleet_notes: row.get("fleet_notes"),
         }
     })
     .fetch_all(pool.get_ref())
@@ -1923,11 +2326,11 @@ pub async fn get_patrimonies_by_department(
     }
 }
 
+// ==================== GET DEPARTMENTS ====================
 pub async fn get_departments(
     pool: web::Data<PgPool>,
-    req: HttpRequest, // ✅ ADICIONE ESTE PARÂMETRO
+    req: HttpRequest,
 ) -> HttpResponse {
-    // ✅ ADICIONE VERIFICAÇÃO DE AUTENTICAÇÃO
     let _user = match auth_middleware(&req, pool.get_ref()).await {
         Ok(Some(user)) => user,
         Ok(None) => return HttpResponse::Unauthorized().json("Authentication required"),
@@ -1950,6 +2353,7 @@ pub async fn get_departments(
     }
 }
 
+// ==================== GET SECTORS ====================
 pub async fn get_patrimonies_sectors(
     pool: web::Data<PgPool>,
     req: HttpRequest,
@@ -1976,6 +2380,7 @@ pub async fn get_patrimonies_sectors(
     }
 }
 
+// ==================== GET SUPPLIERS ====================
 pub async fn get_patrimonies_suppliers(
     pool: web::Data<PgPool>,
     req: HttpRequest,
@@ -2002,6 +2407,7 @@ pub async fn get_patrimonies_suppliers(
     }
 }
 
+// ==================== FLEET ====================
 pub async fn get_fleet(
     pool: web::Data<PgPool>,
     req: HttpRequest,
@@ -2181,12 +2587,11 @@ pub async fn delete_fleet(
     }
 }
 
-// Funções de autenticação
+// ==================== AUTHENTICATION ====================
 pub async fn register_user(
     pool: web::Data<PgPool>,
     user_data: web::Json<CreateUser>,
 ) -> HttpResponse {
-    // Verificar se o usuário já existe
     let existing_user = sqlx::query("SELECT id FROM users WHERE username = $1")
         .bind(&user_data.username)
         .fetch_optional(pool.get_ref())
@@ -2196,7 +2601,6 @@ pub async fn register_user(
         return HttpResponse::BadRequest().json("Username already exists");
     }
 
-    // Hash da senha
     let password_hash = match hash(&user_data.password, DEFAULT_COST) {
         Ok(hash) => hash,
         Err(_) => return HttpResponse::InternalServerError().json("Error hashing password"),
@@ -2247,7 +2651,7 @@ pub async fn login_user(
     )
     .bind(&login_data.username)
     .map(|row: PgRow| {
-        let password_hash: String = row.get("password_hash");
+        let _password_hash: String = row.get("password_hash");
         User {
             id: row.get("id"),
             company_name: row.get("company_name"),
@@ -2264,7 +2668,6 @@ pub async fn login_user(
 
     match result {
         Ok(Some(user)) => {
-            // Verificar senha (precisa buscar o hash separadamente)
             let password_hash_result: Result<(String,), _> = sqlx::query_as(
                 "SELECT password_hash FROM users WHERE username = $1"
             )
@@ -2276,7 +2679,6 @@ pub async fn login_user(
                 Ok((password_hash,)) => {
                     match verify(&login_data.password, &password_hash) {
                         Ok(valid) if valid => {
-                            // Gerar JWT
                             let secret = env::var("JWT_SECRET").unwrap_or_else(|_| "secret".to_string());
                             let expiration = Utc::now()
                                 .checked_add_signed(chrono::Duration::hours(24))
@@ -2319,12 +2721,12 @@ pub async fn login_user(
     }
 }
 
+// ==================== BACKUP ====================
 pub async fn create_backup(
     pool: web::Data<PgPool>,
     req: HttpRequest,
 ) -> HttpResponse {
-    // Verificar autenticação e permissões de admin
-    let user = match auth_middleware(&req, pool.get_ref()).await {
+    let _user = match auth_middleware(&req, pool.get_ref()).await {
         Ok(Some(user)) => {
             if user.role != "admin" {
                 return HttpResponse::Forbidden().json("Admin access required");
@@ -2335,14 +2737,12 @@ pub async fn create_backup(
         Err(e) => return e,
     };
 
-    // Caminho para o script de backup
-    let script_path = "./backup.sh"; // ajuste se necessário
+    let script_path = "./backup.sh";
 
     if !Path::new(script_path).exists() {
         return HttpResponse::InternalServerError().json("Script de backup não encontrado");
     }
 
-    // Executar o script
     let output = Command::new("bash")
         .arg(script_path)
         .output();
@@ -2351,7 +2751,6 @@ pub async fn create_backup(
         Ok(output) => {
             if output.status.success() {
                 let stdout = String::from_utf8_lossy(&output.stdout);
-                // Extrair o nome do arquivo da saída (ex: "✅ Backup concluído: backups/backup-2025-03-12.sql")
                 let filename = stdout.lines()
                     .find(|line| line.contains("backup-"))
                     .and_then(|line| line.split_whitespace().last())
@@ -2383,12 +2782,12 @@ pub async fn create_backup(
     }
 }
 
+// ==================== GET USERS ====================
 pub async fn get_users(
     pool: web::Data<PgPool>,
     req: HttpRequest,
 ) -> HttpResponse {
-    // Verificar autenticação e permissões de admin
-    let user = match auth_middleware(&req, pool.get_ref()).await {
+    let _user = match auth_middleware(&req, pool.get_ref()).await {
         Ok(Some(user)) => {
             if user.role != "admin" {
                 return HttpResponse::Forbidden().json("Admin access required");
@@ -2425,7 +2824,7 @@ pub async fn get_users(
     }
 }
 
-// Funções de transferência (implementações básicas)
+// ==================== TRANSFERS (NOT IMPLEMENTED) ====================
 pub async fn transfer_patrimony() -> HttpResponse {
     HttpResponse::NotImplemented().json("Transfer functionality not implemented yet")
 }

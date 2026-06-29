@@ -53,7 +53,7 @@ export default function DashboardScreen({ navigation }) {
       'sports': 'Esportes',
       'transportation': 'Transporte',
       'finance': 'Finanças',
-      'assistenci': 'Assistencia Comunitaria',
+      'assistenci': 'Assistência Comunitária',
       'tourism': 'Turismo',
       'environment': 'Meio Ambiente',
     };
@@ -88,6 +88,14 @@ export default function DashboardScreen({ navigation }) {
           onPress={() => navigation.navigate('NewPatrimony')}
         >
           <Text style={styles.actionText}>➕ Novo Bem</Text>
+        </TouchableOpacity>
+
+        {/* ✅ NOVO BOTÃO - CADASTRO EM MASSA */}
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.bulkButton]}
+          onPress={() => navigation.navigate('BulkPatrimony')}
+        >
+          <Text style={styles.actionText}>📦 Cadastro em Massa</Text>
         </TouchableOpacity>
       </View>
 
@@ -273,6 +281,9 @@ const styles = StyleSheet.create({
   },
   newButton: {
     backgroundColor: '#059669',
+  },
+  bulkButton: {
+    backgroundColor: '#7c3aed',
   },
   actionText: {
     color: 'white',

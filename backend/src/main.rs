@@ -170,7 +170,17 @@ async fn main() -> std::io::Result<()> {
                     .route("/fleet/{id}", web::get().to(handlers::get_fleet_item))
                     .route("/fleet/{id}", web::put().to(handlers::update_fleet))
                     .route("/fleet/{id}", web::delete().to(handlers::delete_fleet))
-            )
+                    // Adicione esta linha onde você configura as rotas
+                    //.route("/api/patrimony/bulk", web::post().to(patrimony::create_bulk_patrimonies))
+                    // Dentro do web::scope("/api")
+                    .route("/patrimony/bulk", web::post().to(patrimony::create_bulk_patrimonies))
+                    // Adicione estas rotas no web::scope("/api")
+                    .route("/patrimony/{id}/fiscal-document", web::post().to(patrimony::create_fiscal_document))
+                    .route("/fiscal-document/{id}/invoice", web::post().to(patrimony::upload_fiscal_document_invoice))
+                    .route("/fiscal-document/{id}/commitment", web::post().to(patrimony::upload_fiscal_document_commitment))
+                    // Adicione esta rota
+                    .route("/api/patrimony/check-plate", web::get().to(patrimony::check_plate_exists))
+                )
     })
     .bind("0.0.0.0:8080")?
     .run()

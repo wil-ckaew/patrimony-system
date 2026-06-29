@@ -13,7 +13,8 @@ import PatrimonyListScreen from './screens/PatrimonyListScreen';
 import PatrimonyDetailScreen from './screens/PatrimonyDetailScreen';
 import TransferScreen from './screens/TransferScreen';
 import NewPatrimonyScreen from './screens/NewPatrimonyScreen';
-import EditPatrimonyScreen from './screens/EditPatrimonyScreen'; // Adicionado
+import EditPatrimonyScreen from './screens/EditPatrimonyScreen';
+import BulkPatrimonyScreen from './screens/BulkPatrimonyScreen'; // ✅ NOVA TELA
 
 // Contexto de autenticação
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -77,8 +78,13 @@ function AppContent() {
             />
             <Stack.Screen 
               name="EditPatrimony" 
-              component={EditPatrimonyScreen} // Adicionado
+              component={EditPatrimonyScreen}
               options={{ title: 'Editar Bem Patrimonial' }}
+            />
+            <Stack.Screen 
+              name="BulkPatrimony" 
+              component={BulkPatrimonyScreen}
+              options={{ title: '📦 Cadastro em Massa' }}
             />
           </>
         )}

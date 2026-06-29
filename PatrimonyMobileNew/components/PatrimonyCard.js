@@ -34,15 +34,23 @@ export default function PatrimonyCard({ item, onPress }) {
       'sports': 'Esportes',
       'transportation': 'Transporte',
       'finance': 'Finanças',
-      'assistenci': 'Assistencia Comunitaria',
+      'assistenci': 'Assistência Comunitária',
       'tourism': 'Turismo',
       'environment': 'Meio Ambiente',
     };
     return departmentNames[dept] || dept;
   };
 
+  const formatValue = (value) => {
+    if (!value || value === 0) return null;
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(value);
+  };
+
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress}>
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
       {item.imageUrl ? (
         <Image 
           source={{ uri: `${API_BASE_URL}${item.imageUrl}` }} 
@@ -52,19 +60,23 @@ export default function PatrimonyCard({ item, onPress }) {
         />
       ) : (
         <View style={styles.noImageContainer}>
-          <Text style={styles.noImageText}>Sem imagem</Text>
+          <Text style={styles.noImageText}>📷 Sem imagem</Text>
         </View>
       )}
       
       <View style={styles.content}>
+        {/* Número do Patrimônio em DESTAQUE */}
+        <View style={styles.plateContainer}>
+          <Text style={styles.plateLabel}>PATRIMÔNIO</Text>
+          <Text style={styles.plateNumber}>{item.plate}</Text>
+        </View>
+        
         <View style={styles.header}>
-          <Text style={styles.plate}>{item.plate}</Text>
+          <Text style={styles.name}>{item.name}</Text>
           <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
             <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
           </View>
         </View>
-        
-        <Text style={styles.name}>{item.name}</Text>
         
         <View style={styles.details}>
           <Text style={styles.detailText}>{getDepartmentName(item.department)}</Text>
@@ -78,12 +90,18 @@ export default function PatrimonyCard({ item, onPress }) {
         )}
         
         {item.value > 0 && (
-          <Text style={styles.value}>
-            {new Intl.NumberFormat('pt-BR', {
-              style: 'currency',
-              currency: 'BRL'
-            }).format(item.value)}
-          </Text>
+          <Text style={styles.value}>{formatValue(item.value)}</Text>
+        )}
+        
+        {(item.invoiceNumber || item.commitmentNumber) && (
+          <View style={styles.fiscalInfo}>
+            {item.invoiceNumber && (
+              <Text style={styles.fiscalText}>NF: {item.invoiceNumber}</Text>
+            )}
+            {item.commitmentNumber && (
+              <Text style={styles.fiscalText}>Empenho: {item.commitmentNumber}</Text>
+            )}
+          </View>
         )}
       </View>
     </TouchableOpacity>
@@ -123,16 +141,39 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
   },
+  // ✅ NOVO ESTILO PARA DESTAQUE DO PATRIMÔNIO
+  plateContainer: {
+    backgroundColor: '#2563eb',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  plateLabel: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 1,
+  },
+  plateNumber: {
+    color: 'white',
+    fontSize: 22,
+    fontWeight: 'bold',
+    letterSpacing: 1,
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
   },
-  plate: {
+  name: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: '#1f2937',
+    flex: 1,
+    marginRight: 8,
   },
   statusBadge: {
     paddingHorizontal: 8,
@@ -141,26 +182,20 @@ const styles = StyleSheet.create({
   },
   statusText: {
     color: 'white',
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '600',
-  },
-  name: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1f2937',
-    marginBottom: 8,
   },
   details: {
     flexDirection: 'row',
     marginBottom: 8,
   },
   detailText: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#6b7280',
     marginRight: 8,
   },
   description: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#6b7280',
     marginBottom: 8,
   },
@@ -168,5 +203,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#059669',
+  },
+  fiscalInfo: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  fiscalText: {
+    fontSize: 11,
+    color: '#6b7280',
   },
 });

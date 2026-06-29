@@ -1,4 +1,5 @@
 // components/PatrimonyList.tsx
+
 import React, { useState, useEffect } from 'react';
 import { PatrimonyItem } from '../types/Patrimony';
 import styles from './PatrimonyList.module.css';
@@ -74,7 +75,6 @@ export default function PatrimonyList({
   
       const params = new URLSearchParams();
       
-      // ✅ Envia o searchQuery como parâmetro 'search'
       if (searchQuery && searchQuery.trim()) {
         params.append('search', searchQuery.trim());
         console.log('🔍 Buscando por:', searchQuery);
@@ -128,6 +128,9 @@ export default function PatrimonyList({
         nfIssueDate: item.nf_issue_date,
         supplier: item.supplier,
         isVehicle: item.is_vehicle || false,
+        // ✅ NOVOS CAMPOS DA FROTA
+        fleetNumber: item.fleet_number || undefined,
+        fleetNotes: item.fleet_notes || undefined,
         createdAt: item.created_at,
         updatedAt: item.updated_at
       })) as PatrimonyItem[];
@@ -215,6 +218,7 @@ export default function PatrimonyList({
               <th>Placa</th>
               <th>Departamento</th>
               <th>Setor</th>
+              <th>Frota</th>          {/* ✅ NOVO */}
               <th>Status</th>
               <th>Valor</th>
               <th>Ações</th>
@@ -223,7 +227,7 @@ export default function PatrimonyList({
           <tbody>
             {patrimonies.length === 0 ? (
               <tr>
-                <td colSpan={8} className={styles.emptyState}>
+                <td colSpan={9} className={styles.emptyState}>
                   {searchQuery 
                     ? `Nenhum bem patrimonial encontrado para "${searchQuery}".` 
                     : 'Nenhum bem patrimonial encontrado.'
@@ -255,10 +259,19 @@ export default function PatrimonyList({
                       <td>{getDepartmentName(item.department)}</td>
                       <td>{item.sector || 'N/A'}</td>
                       <td>
+                        {item.fleetNumber ? (
+                          <span className={styles.fleetBadge}>
+                            🚛 {item.fleetNumber}
+                          </span>
+                        ) : (
+                          <span className={styles.emptyValue}>-</span>
+                        )}
+                      </td>
+                      <td>
                         <span className={`${styles.status} ${getStatusClass(item.status)}`}>
                           {getStatusName(item.status)}
                         </span>
-                       </td>
+                      </td>
                       <td>R$ {item.value.toFixed(2)}</td>
                       <td>
                         <div className={styles.rowActions}>
@@ -284,11 +297,11 @@ export default function PatrimonyList({
                             🗑️
                           </button>
                         </div>
-                       </td>
+                      </td>
                     </tr>
                     {isExpanded && (
                       <tr className={`${styles.expandedRow} ${rowClass}`}>
-                        <td colSpan={8}>
+                        <td colSpan={9}>
                           <div className={styles.expandedContent}>
                             <div className={styles.imageSection}>
                               {imageFullUrl ? (
@@ -309,6 +322,11 @@ export default function PatrimonyList({
                               ) : (
                                 <div className={styles.noImage}><span>📷 Sem imagem disponível</span></div>
                               )}
+                              
+                              <div className={styles.patrimonyNumberHighlight}>
+                                <span className={styles.patrimonyNumberLabel}>Nº do Patrimonio</span>
+                                <strong className={styles.patrimonyNumberValue}>{item.plate}</strong>
+                              </div>
                             </div>
 
                             <div className={styles.detailsGrid}>
@@ -333,6 +351,21 @@ export default function PatrimonyList({
                                   {item.supplier && (
                                     <div className={styles.orgDetail}>
                                       <strong>Fornecedor:</strong> {item.supplier}
+                                    </div>
+                                  )}
+
+                                  {/* ✅ INFORMAÇÕES DA FROTA */}
+                                  {item.fleetNumber && (
+                                    <div className={styles.orgDetail}>
+                                      <strong>🚛 Frota:</strong> 
+                                      <span className={styles.fleetBadge}>{item.fleetNumber}</span>
+                                    </div>
+                                  )}
+
+                                  {item.fleetNotes && (
+                                    <div className={styles.orgDetail}>
+                                      <strong>📝 Obs. Frota:</strong> 
+                                      <span className={styles.fleetNotesText}>{item.fleetNotes}</span>
                                     </div>
                                   )}
                                 </div>

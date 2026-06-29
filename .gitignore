@@ -1,31 +1,115 @@
-# Node
-node_modules/
-frontend/node_modules/
+# ==================== RUST ====================
+/target/
+**/*.rs.bk
+*.pdb
+*.dSYM
+*.exp
+*.ilk
+*.lib
+*.so
+*.dylib
+*.dll
+*.rlib
+*.rmeta
+Cargo.lock
 
-# Next.js
-.next/
-out/
+# ==================== NODE/FRONTEND ====================
+/frontend/node_modules/
+/frontend/.next/
+/frontend/out/
+/frontend/build/
+/frontend/dist/
+/frontend/.cache/
+/frontend/*.log
+/frontend/.env*.local
+/frontend/.vercel
+/package-lock.json
 
-# Rust
-target/
+# ==================== DOCKER ====================
+*.pid
+docker-compose.override.yml
+.dockerignore
 
-# Build
-dist/
-build/
+# ==================== BANCOS DE DADOS E BACKUPS ====================
+*.sql
+*.sql.gz
+*.sql.zip
+*.dump
+*.backup
+/backups/
+/backup/
+/backup_*.sql
+*.pgdump
+*.pgbackup
+!migrations/*.sql
 
-# Env
+# ==================== UPLOADS E DOCUMENTOS ====================
+/uploads/
+/documents/
+/reports/
+/signed_reports/
+/static/
+/media/
+/private/
+*.pdf
+*.doc
+*.docx
+*.xls
+*.xlsx
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.svg
+*.bmp
+*.tiff
+*.webp
+
+# ==================== ENVIRONMENT ====================
 .env
 .env.local
+.env.*.local
+*.env
+.env.production
+.env.development
+.env.test
 
-# Logs
-*.log
-
-# TypeScript
-*.tsbuildinfo
-
-# Uploads
-uploads/
-
-# OS
+# ==================== IDE E EDITORES ====================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.bak
+*.tmp
 .DS_Store
 Thumbs.db
+*.log
+*.cache
+
+# ==================== DEPENDÊNCIAS ====================
+/backend/target/
+/backend/Cargo.lock
+/frontend/.next/
+/frontend/node_modules/
+
+# ==================== TESTES E COBERTURA ====================
+*.prof
+*.gcda
+*.gcno
+*.gcov
+coverage/
+*.lcov
+*.cov
+
+# ==================== OUTROS ====================
+*.pid
+*.lock
+.npm
+.yarn
+.pnpm
+*.tar.gz
+*.tgz
+*.zip
+*.rar
+*.7z

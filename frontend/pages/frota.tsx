@@ -22,7 +22,9 @@ export default function FrotaPage() {
     setShowForm(true);
   };
 
-  const handleRefresh = () => setRefreshTrigger((prev) => prev + 1);
+  const handleRefresh = () => {
+    setRefreshTrigger((prev) => prev + 1);
+  };
 
   return (
     <>
@@ -31,34 +33,56 @@ export default function FrotaPage() {
       </Head>
 
       <main className={styles.pageWrapper}>
+        {/* HEADER */}
         <div className={styles.topbar}>
           <div className={styles.headerLeft}>
-            <div className={styles.logo}>SGF</div>
+            <div className={styles.logo}>
+              🚘
+            </div>
+
             <div className={styles.headerText}>
-              <h1 className={styles.headerTitle}>Sistema de Gestão de Frota</h1>
-              <p className={styles.headerSub}>Ambiente Oficial</p>
+              <h1 className={styles.headerTitle}>
+                Sistema de Gestão de Frota
+              </h1>
+
+              <p className={styles.headerSub}>
+                Controle completo de veículos oficiais
+              </p>
             </div>
           </div>
 
           <div className={styles.topbarActions}>
-            <button type="button" className={styles.actionButton} onClick={openNewForm}>
-              Nova frota
+            <button
+              type="button"
+              className={styles.primaryButton}
+              onClick={openNewForm}
+            >
+              ➕ Nova Frota
             </button>
-            <Link href="/">
-              <a className={styles.actionButton}>Voltar ao patrimônio</a>
+
+            <Link href="/" className={styles.secondaryButton}>
+              ← Voltar ao Patrimônio
             </Link>
           </div>
         </div>
 
-        <div style={{ background: 'white', borderRadius: '24px', padding: '1.5rem', boxShadow: '0 30px 80px rgba(15, 23, 42, 0.06)' }}>
-          <FleetList onEdit={handleEdit} refreshTrigger={refreshTrigger} />
+        {/* CONTEÚDO */}
+        <div className={styles.contentCard}>
+          <FleetList
+            onEdit={handleEdit}
+            refreshTrigger={refreshTrigger}
+          />
         </div>
 
+        {/* MODAL FORM */}
         {showForm && (
           <FleetForm
             item={selectedItem}
             onClose={() => setShowForm(false)}
-            onRefresh={() => { handleRefresh(); setShowForm(false); }}
+            onRefresh={() => {
+              handleRefresh();
+              setShowForm(false);
+            }}
           />
         )}
       </main>
