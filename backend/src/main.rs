@@ -1,30 +1,23 @@
 use actix_web::{web, App, HttpServer, HttpResponse};
 use actix_cors::Cors;
 use actix_files::Files;
-use sqlx::postgres::{PgPoolOptions, PgConnectOptions};
 use sqlx::{Pool, Postgres};
-use std::time::Duration;
 use std::fs;
 use std::path::Path;
-use dotenv::dotenv; // ✅ ADICIONE ESTA IMPORTACAO
-use crate::handlers::patrimony; // <-- ADICIONE ESTA LINHA
+use dotenv::dotenv;
+use crate::handlers::patrimony;
 
 mod handlers;
 mod models;
 mod database;
 
-// the explicit init_database logic has been moved to `database::init()`
-// since that function already handles environment parsing, retries and
-// migrations. we keep the helper here only to satisfy any existing callers,
-// but it simply delegates to the module implementation so that configuration
-// stays in one place.
 async fn init_database() -> Result<Pool<Postgres>, sqlx::Error> {
     database::init().await
 }
 
 async fn debug_uploads() -> HttpResponse {
     let upload_dir = "./uploads";
-    let docs_dir = "./documents"; // ✅ ADICIONE DOCUMENTS TAMBÉM
+    let docs_dir = "./documents";
     let mut files = Vec::new();
     let mut doc_files = Vec::new();
     
@@ -68,12 +61,10 @@ async fn debug_uploads() -> HttpResponse {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    // ✅ CARREGAR VARIAVEIS DE AMBIENTE NO INICIO
     dotenv().ok();
     
-    // CRIAR DIRETORIOS SE NAO EXISTIREM
     let upload_dir = "./uploads";
-    let docs_dir = "./documents"; // ✅ CRIAR DIRETORIO DE DOCUMENTOS
+    let docs_dir = "./documents";
     
     if !Path::new(upload_dir).exists() {
         if let Err(e) = fs::create_dir_all(upload_dir) {
@@ -137,14 +128,15 @@ async fn main() -> std::io::Result<()> {
                     .show_files_listing()
                     .use_last_modified(true),
             )
-            // ✅ ROTAS PÚBLICAS (não requerem autenticação)
+            // ROTAS PÚBLICAS
             .route("/api/register", web::post().to(handlers::register_user_handler))
             .route("/api/login", web::post().to(handlers::login_user_handler))
             .route("/api/health", web::get().to(handlers::health_check))
             .route("/api/debug/uploads", web::get().to(debug_uploads))
-             // ✅ ROTAS PROTEGIDAS (requerem autenticação)
-             .service(
+            // ROTAS PROTEGIDAS
+            .service(
                 web::scope("/api")
+                    // PATRIMONY
                     .route("/patrimony", web::get().to(handlers::get_patrimonies))
                     .route("/patrimony", web::post().to(handlers::create_patrimony))
                     .route("/patrimony/{id}", web::get().to(handlers::get_patrimony))
@@ -152,9 +144,53 @@ async fn main() -> std::io::Result<()> {
                     .route("/patrimony/{id}", web::delete().to(handlers::delete_patrimony))
                     .route("/patrimony/{id}/image", web::post().to(handlers::upload_image))
                     .route("/patrimony/{id}/document/{doc_type}", web::post().to(handlers::upload_document_handler))
+                    .route("/patrimony/bulk", web::post().to(patrimony::create_bulk_patrimonies))
+                    .route("/patrimony/{id}/fiscal-document", web::post().to(patrimony::create_fiscal_document))
+                    .route("/fiscal-document/{id}/invoice", web::post().to(patrimony::upload_fiscal_document_invoice))
+                    .route("/fiscal-document/{id}/commitment", web::post().to(patrimony::upload_fiscal_document_commitment))
+                    .route("/patrimony/check-plate", web::get().to(patrimony::check_plate_exists))
+                    // TRANSFER
                     .route("/transfer", web::post().to(handlers::transfer_patrimony))
                     .route("/transfers", web::get().to(handlers::get_transfers))
                     .route("/transfer/{id}", web::get().to(handlers::get_transfer))
+                    // FLEET
+                    .route("/fleet", web::get().to(handlers::get_fleet))
+                    .route("/fleet", web::post().to(handlers::create_fleet))
+                    .route("/fleet/{id}", web::get().to(handlers::get_fleet_item))
+                    .route("/fleet/{id}", web::put().to(handlers::update_fleet))
+                    .route("/fleet/{id}", web::delete().to(handlers::delete_fleet))
+                    // ============================================
+                    // AUCTIONS - MÓDULO DE LEILÕES COMPLETO
+                    // ============================================
+                    // CRUD Leilões
+                    .route("/auctions", web::get().to(handlers::auction::get_all_auctions))
+                    .route("/auctions", web::post().to(handlers::auction::create_auction))
+                    .route("/auctions/{id}", web::get().to(handlers::auction::get_auction_by_id))
+                    .route("/auctions/{id}", web::put().to(handlers::auction::update_auction))
+                    .route("/auctions/{id}", web::delete().to(handlers::auction::delete_auction))
+                    // Veículos do Leilão
+                    .route("/auctions/{id}/vehicles", web::post().to(handlers::auction::add_vehicle_to_auction))
+                    .route("/auctions/{id}/vehicles", web::get().to(handlers::auction::get_auction_vehicles))
+                    .route("/auctions/{auction_id}/vehicles/{vehicle_id}", web::delete().to(handlers::auction::remove_vehicle_from_auction))
+                    .route("/auctions/vehicles/{id}", web::put().to(handlers::auction::update_auction_vehicle))
+                    .route("/auctions/vehicles/available", web::get().to(handlers::auction::get_available_vehicles))
+                    // Fotos do Veículo
+                    .route("/auctions/vehicles/{id}/photos/{photo_type}", web::post().to(handlers::auction::upload_vehicle_photo))
+                    .route("/auctions/vehicles/{id}/photos", web::get().to(handlers::auction::get_vehicle_photos))
+                    // Histórico
+                    .route("/auctions/vehicles/{id}/history", web::get().to(handlers::auction::get_auction_history))
+                    .route("/auctions/logs", web::get().to(handlers::auction::get_auction_logs))
+                    // Finalizar Leilão
+                    .route("/auctions/{id}/finalize", web::post().to(handlers::auction::finalize_auction))
+                    // PDFs do Leilão
+                    .route("/auctions/{id}/pdfs", web::post().to(handlers::auction::upload_auction_pdf))
+                    .route("/auctions/{id}/pdfs", web::get().to(handlers::auction::get_auction_pdfs))
+                    // Relatórios
+                    .route("/auctions/report", web::get().to(handlers::auction::get_auctioned_vehicles_report))
+                    .route("/auctions/vehicles/auctioned", web::get().to(handlers::auction::get_auctioned_vehicles))
+                    // ============================================
+                    // OUTROS
+                    // ============================================
                     .route("/stats", web::get().to(handlers::get_stats))
                     .route("/users", web::get().to(handlers::get_users_handler))
                     .route("/debug/images", web::get().to(handlers::debug_images_handler))
@@ -165,11 +201,9 @@ async fn main() -> std::io::Result<()> {
                     .route("/departments", web::get().to(handlers::get_departments))
                     .route("/patrimonies/sectors", web::get().to(handlers::get_patrimonies_sectors))
                     .route("/patrimonies/suppliers", web::get().to(handlers::get_patrimonies_suppliers))
-                    .route("/fleet", web::get().to(handlers::get_fleet))
-                    .route("/fleet", web::post().to(handlers::create_fleet))
-                    .route("/fleet/{id}", web::get().to(handlers::get_fleet_item))
-                    .route("/fleet/{id}", web::put().to(handlers::update_fleet))
-                    .route("/fleet/{id}", web::delete().to(handlers::delete_fleet))
+                    // Dentro do scope "/api", adicionar a rota DELETE
+                    .route("/auctions/vehicles/{id}/photos/{photo_type}", web::delete().to(handlers::auction::delete_vehicle_photo))
+                    .route("/auctions/{id}/pdfs/{pdf_id}", web::delete().to(handlers::auction::delete_auction_pdf))
             )
     })
     .bind("0.0.0.0:8080")?

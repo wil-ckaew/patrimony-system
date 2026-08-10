@@ -13,3 +13,4 @@ pub use patrimony::{
     CreateFleet,
     UpdateFleet,
 };
+pub mod auction;

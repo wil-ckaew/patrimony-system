@@ -1,0 +1,142 @@
+// ==================== BACKUP ====================
+pub async fn create_backup(
+    pool: web::Data<PgPool>,
+    req: HttpRequest,
+) -> HttpResponse {
+    use chrono::Local;
+    use std::process::Command;
+    use std::fs;
+    use std::path::Path;
+    
+    let timestamp = Local::now().format("%Y%m%d_%H%M%S");
+    let filename = format!("backup_{}.sql", timestamp);
+    let backup_dir = "./backups";
+    
+    if !Path::new(backup_dir).exists() {
+        if let Err(e) = fs::create_dir_all(backup_dir) {
+            return HttpResponse::InternalServerError().body(format!("Erro ao criar diretório: {}", e));
+        }
+    }
+    
+    let backup_path = format!("{}/{}", backup_dir, filename);
+    
+    // Usar o container do PostgreSQL diretamente
+    // O comando "which pg_dump" não funciona, então usamos o caminho completo
+    let output = Command::new("sh")
+        .arg("-c")
+        .arg(format!(
+            "docker exec patrimony-system-db-1 pg_dump -U postgres -d patrimony --clean --if-exists > {}",
+            backup_path
+        ))
+        .output();
+    
+    match output {
+        Ok(output) if output.status.success() => {
+            // Verificar se o arquivo foi criado
+            if let Ok(metadata) = fs::metadata(&backup_path) {
+                HttpResponse::Ok().json(serde_json::json!({
+                    "filename": filename,
+                    "size": metadata.len(),
+                    "created_at": Local::now().format("%Y-%m-%d %H:%M:%S").to_string()
+                }))
+            } else {
+                HttpResponse::InternalServerError().body("Arquivo de backup não foi criado")
+            }
+        }
+        Ok(output) => {
+            let error_msg = String::from_utf8_lossy(&output.stderr);
+            // Tentar método alternativo: usar o script backup_inicial.sh
+            let output2 = Command::new("sh")
+                .arg("-c")
+                .arg("./backup_inicial.sh")
+                .output();
+            
+            match output2 {
+                Ok(out2) if out2.status.success() => {
+                    // Procurar o backup mais recente
+                    let entries = match fs::read_dir(backup_dir) {
+                        Ok(e) => e,
+                        Err(e) => {
+                            return HttpResponse::InternalServerError().body(format!("Erro ao ler diretório: {}", e));
+                        }
+                    };
+                    
+                    let mut latest = None;
+                    let mut latest_time = 0;
+                    
+                    for entry in entries {
+                        let entry = match entry {
+                            Ok(e) => e,
+                            Err(_) => continue,
+                        };
+                        
+                        let path = entry.path();
+                        if path.is_file() {
+                            let metadata = match fs::metadata(&path) {
+                                Ok(m) => m,
+                                Err(_) => continue,
+                            };
+                            
+                            let modified = metadata.modified()
+                                .ok()
+                                .and_then(|t| t.elapsed().ok())
+                                .map(|d| d.as_secs())
+                                .unwrap_or(0);
+                            
+                            if modified > latest_time {
+                                latest_time = modified;
+                                latest = Some(path);
+                            }
+                        }
+                    }
+                    
+                    if let Some(path) = latest {
+                        let filename = path.file_name()
+                            .unwrap_or_default()
+                            .to_string_lossy()
+                            .to_string();
+                        
+                        let metadata = match fs::metadata(&path) {
+                            Ok(m) => m,
+                            Err(e) => return HttpResponse::InternalServerError().body(format!("Erro ao ler metadados: {}", e)),
+                        };
+                        
+                        HttpResponse::Ok().json(serde_json::json!({
+                            "filename": filename,
+                            "size": metadata.len(),
+                            "created_at": Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+                            "method": "script"
+                        }))
+                    } else {
+                        HttpResponse::Ok().json(serde_json::json!({
+                            "message": "Backup criado via script",
+                            "timestamp": timestamp
+                        }))
+                    }
+                }
+                _ => {
+                    HttpResponse::InternalServerError().body(format!("Erro ao criar backup: {}", error_msg))
+                }
+            }
+        }
+        Err(e) => {
+            // Última tentativa: usar o script
+            let output2 = Command::new("sh")
+                .arg("-c")
+                .arg("./backup_inicial.sh")
+                .output();
+            
+            match output2 {
+                Ok(out2) if out2.status.success() => {
+                    HttpResponse::Ok().json(serde_json::json!({
+                        "message": "Backup criado via script (fallback)",
+                        "timestamp": timestamp
+                    }))
+                }
+                _ => {
+                    HttpResponse::InternalServerError().body(format!("Erro ao executar backup: {}", e))
+                }
+            }
+        }
+    }
+}

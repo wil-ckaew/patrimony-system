@@ -83,6 +83,9 @@ pub struct Patrimony {
     pub updated_at: chrono::DateTime<Utc>,
     // ⚠️ ADICIONE ESTE CAMPO:
     pub fiscal_documents: Option<Vec<FiscalDocument>>,
+    // ✅ ADICIONE ESTES CAMPOS:
+    pub fleet_number: Option<String>,      // Número da frota
+    pub fleet_notes: Option<String>,       // Observação da frota
 }
 
 #[derive(Deserialize)]

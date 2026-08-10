@@ -40,7 +40,7 @@ services:
       - ./backups:/app/backups
       - ./restore-backup.sh:/app/restore-backup.sh
       - ./backup.sh:/app/backup.sh
-
+      - /var/run/docker.sock:/var/run/docker.sock  # 🔥 ADICIONAR ESTA LINHA!
   frontend:
     build: ./frontend
     container_name: patrimony-frontend

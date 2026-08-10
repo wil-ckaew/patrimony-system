@@ -1,0 +1,834 @@
+use actix_web::{web, HttpResponse, Result, HttpRequest};
+use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
+use uuid::Uuid;
+use chrono::NaiveDate;
+
+// ===== MODELS =====
+#[derive(Debug, Serialize, Deserialize, Clone, sqlx::FromRow)]
+pub struct Auction {
+    pub id: Uuid,
+    pub auction_number: String,
+    pub edital_number: Option<String>,
+    pub auction_date: Option<NaiveDate>,
+    pub auctioneer: Option<String>,
+    pub company: Option<String>,
+    pub status: String,
+    pub notes: Option<String>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, sqlx::FromRow)]
+pub struct AuctionVehicle {
+    pub id: Uuid,
+    pub auction_id: Uuid,
+    pub vehicle_id: Uuid,
+    pub sold_value: Option<f64>,
+    pub buyer_name: Option<String>,
+    pub buyer_document: Option<String>,
+    pub detran_status: String,
+    pub protocol_number: Option<String>,
+    pub chassi_photo_path: Option<String>,
+    pub plate_photo_path: Option<String>,
+    pub front_photo_path: Option<String>,
+    pub rear_photo_path: Option<String>,
+    pub engine_photo_path: Option<String>,
+    pub document_path: Option<String>,
+    pub detran_request_date: Option<NaiveDate>,
+    pub detran_protocol: Option<String>,
+    pub detran_observation: Option<String>,
+    pub sale_date: Option<NaiveDate>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, sqlx::FromRow)]
+pub struct AuctionHistory {
+    pub id: Uuid,
+    pub auction_vehicle_id: Uuid,
+    pub action: String,
+    pub old_status: Option<String>,
+    pub new_status: Option<String>,
+    pub user_name: String,
+    pub changes: Option<serde_json::Value>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, sqlx::FromRow)]
+pub struct AuctionPdf {
+    pub id: Uuid,
+    pub auction_id: Uuid,
+    pub document_type: String,
+    pub file_path: String,
+    pub file_name: Option<String>,
+    pub uploaded_by: Option<String>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, sqlx::FromRow)]
+pub struct AuctionFullReport {
+    pub auction_id: Uuid,
+    pub auction_number: String,
+    pub edital_number: Option<String>,
+    pub auction_date: Option<NaiveDate>,
+    pub auctioneer: Option<String>,
+    pub company: Option<String>,
+    pub auction_status: String,
+    pub auction_notes: Option<String>,
+    pub vehicle_id: Uuid,
+    pub fleet_number: String,
+    pub patrimony_name: String,
+    pub patrimony_plate: String,
+    pub chassi: Option<String>,
+    pub renavam: Option<String>,
+    pub model: Option<String>,
+    pub year: Option<i32>,
+    pub department: String,
+    pub sector: Option<String>,
+    pub auction_vehicle_id: Uuid,
+    pub sold_value: Option<f64>,
+    pub buyer_name: Option<String>,
+    pub buyer_document: Option<String>,
+    pub detran_status: Option<String>,
+    pub detran_protocol: Option<String>,
+    pub detran_request_date: Option<NaiveDate>,
+    pub sale_date: Option<NaiveDate>,
+    pub chassi_photo_path: Option<String>,
+    pub plate_photo_path: Option<String>,
+    pub front_photo_path: Option<String>,
+    pub rear_photo_path: Option<String>,
+    pub engine_photo_path: Option<String>,
+    pub document_path: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, sqlx::FromRow)]
+pub struct AuctionLog {
+    pub id: Uuid,
+    pub vehicle_id: Option<Uuid>,
+    pub auction_id: Option<Uuid>,
+    pub user_name: String,
+    pub action: String,
+    pub details: Option<serde_json::Value>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+}
+
+// ===== NOVA STRUCT PARA VEÍCULOS DISPONÍVEIS =====
+#[derive(Debug, Serialize, Deserialize, Clone, sqlx::FromRow)]
+pub struct AvailableVehicle {
+    pub id: Uuid,
+    pub fleet_number: String,
+    pub patrimony_name: String,
+    pub patrimony_plate: String,
+    pub chassi: Option<String>,
+    pub renavam: Option<String>,
+    pub model: Option<String>,
+    pub year: Option<i32>,
+    pub department: String,
+}
+
+// ===== DTOS =====
+#[derive(Debug, Deserialize)]
+pub struct CreateAuctionDto {
+    pub auction_number: String,
+    pub edital_number: Option<String>,
+    pub auction_date: Option<NaiveDate>,
+    pub auctioneer: Option<String>,
+    pub company: Option<String>,
+    pub notes: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateAuctionDto {
+    pub auction_number: Option<String>,
+    pub edital_number: Option<String>,
+    pub auction_date: Option<NaiveDate>,
+    pub auctioneer: Option<String>,
+    pub company: Option<String>,
+    pub status: Option<String>,
+    pub notes: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AddVehicleToAuctionDto {
+    pub vehicle_id: Uuid,
+    pub sold_value: Option<f64>,
+    pub buyer_name: Option<String>,
+    pub buyer_document: Option<String>,
+    pub detran_status: Option<String>,
+    pub protocol_number: Option<String>,
+    pub sale_date: Option<NaiveDate>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateAuctionVehicleDto {
+    pub sold_value: Option<f64>,
+    pub buyer_name: Option<String>,
+    pub buyer_document: Option<String>,
+    pub detran_status: Option<String>,
+    pub protocol_number: Option<String>,
+    pub detran_protocol: Option<String>,
+    pub detran_observation: Option<String>,
+    pub detran_request_date: Option<NaiveDate>,
+    pub sale_date: Option<NaiveDate>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct FinalizeAuctionDto {
+    pub status: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SearchAuctionVehiclesDto {
+    pub search: Option<String>,
+    pub status: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AddPdfDto {
+    pub document_type: String,
+    pub file_name: Option<String>,
+}
+
+// ===== HANDLERS =====
+
+// ---------- LEILÕES ----------
+
+pub async fn create_auction(
+    pool: web::Data<PgPool>,
+    dto: web::Json<CreateAuctionDto>,
+) -> Result<HttpResponse> {
+    let auction = sqlx::query_as::<_, Auction>(
+        r#"
+        INSERT INTO auctions (
+            auction_number, edital_number, auction_date,
+            auctioneer, company, status, notes
+        )
+        VALUES ($1, $2, $3, $4, $5, 'EM_PREPARACAO', $6)
+        RETURNING *
+        "#
+    )
+    .bind(&dto.auction_number)
+    .bind(&dto.edital_number)
+    .bind(&dto.auction_date)
+    .bind(&dto.auctioneer)
+    .bind(&dto.company)
+    .bind(&dto.notes)
+    .fetch_one(pool.get_ref())
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+
+    Ok(HttpResponse::Created().json(auction))
+}
+
+pub async fn get_all_auctions(
+    pool: web::Data<PgPool>,
+) -> Result<HttpResponse> {
+    let auctions = sqlx::query_as::<_, Auction>(
+        "SELECT * FROM auctions ORDER BY created_at DESC"
+    )
+    .fetch_all(pool.get_ref())
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+
+    Ok(HttpResponse::Ok().json(auctions))
+}
+
+pub async fn get_auction_by_id(
+    pool: web::Data<PgPool>,
+    path: web::Path<Uuid>,
+) -> Result<HttpResponse> {
+    let id = path.into_inner();
+    
+    let auction = sqlx::query_as::<_, Auction>(
+        "SELECT * FROM auctions WHERE id = $1"
+    )
+    .bind(id)
+    .fetch_one(pool.get_ref())
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+
+    Ok(HttpResponse::Ok().json(auction))
+}
+
+pub async fn update_auction(
+    pool: web::Data<PgPool>,
+    path: web::Path<Uuid>,
+    dto: web::Json<UpdateAuctionDto>,
+) -> Result<HttpResponse> {
+    let id = path.into_inner();
+    
+    let current: Auction = sqlx::query_as(
+        "SELECT * FROM auctions WHERE id = $1"
+    )
+    .bind(id)
+    .fetch_one(pool.get_ref())
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+    
+    let status = match &dto.status {
+        Some(s) => s.clone(),
+        None => current.status,
+    };
+
+    let auction = sqlx::query_as::<_, Auction>(
+        r#"
+        UPDATE auctions SET
+            auction_number = COALESCE($1, auction_number),
+            edital_number = COALESCE($2, edital_number),
+            auction_date = COALESCE($3, auction_date),
+            auctioneer = COALESCE($4, auctioneer),
+            company = COALESCE($5, company),
+            status = $6,
+            notes = COALESCE($7, notes)
+        WHERE id = $8
+        RETURNING *
+        "#
+    )
+    .bind(&dto.auction_number)
+    .bind(&dto.edital_number)
+    .bind(&dto.auction_date)
+    .bind(&dto.auctioneer)
+    .bind(&dto.company)
+    .bind(status)
+    .bind(&dto.notes)
+    .bind(id)
+    .fetch_one(pool.get_ref())
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+
+    Ok(HttpResponse::Ok().json(auction))
+}
+
+pub async fn delete_auction(
+    pool: web::Data<PgPool>,
+    path: web::Path<Uuid>,
+) -> Result<HttpResponse> {
+    let id = path.into_inner();
+    
+    sqlx::query("DELETE FROM auctions WHERE id = $1")
+        .bind(id)
+        .execute(pool.get_ref())
+        .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "message": "Leilão excluído com sucesso"
+    })))
+}
+
+// ---------- VEÍCULOS DO LEILÃO ----------
+
+pub async fn add_vehicle_to_auction(
+    pool: web::Data<PgPool>,
+    path: web::Path<Uuid>,
+    dto: web::Json<AddVehicleToAuctionDto>,
+) -> Result<HttpResponse> {
+    let auction_id = path.into_inner();
+    
+    let exists: Option<(i64,)> = sqlx::query_as(
+        "SELECT 1 FROM auction_vehicles WHERE auction_id = $1 AND vehicle_id = $2"
+    )
+    .bind(auction_id)
+    .bind(dto.vehicle_id)
+    .fetch_optional(pool.get_ref())
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+
+    if exists.is_some() {
+        return Ok(HttpResponse::BadRequest().json(serde_json::json!({
+            "error": "Veículo já está neste leilão"
+        })));
+    }
+    
+    let auction_vehicle = sqlx::query_as::<_, AuctionVehicle>(
+        r#"
+        INSERT INTO auction_vehicles (
+            auction_id, vehicle_id, sold_value, buyer_name, buyer_document,
+            detran_status, protocol_number, sale_date
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING *
+        "#
+    )
+    .bind(auction_id)
+    .bind(dto.vehicle_id)
+    .bind(dto.sold_value)
+    .bind(&dto.buyer_name)
+    .bind(&dto.buyer_document)
+    .bind(&dto.detran_status)
+    .bind(&dto.protocol_number)
+    .bind(dto.sale_date)
+    .fetch_one(pool.get_ref())
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+
+    // Registrar histórico
+    let _ = sqlx::query(
+        r#"
+        INSERT INTO auction_history (
+            auction_vehicle_id, action, user_name, changes
+        )
+        VALUES ($1, 'ADICIONADO', 'Sistema', $2)
+        "#
+    )
+    .bind(auction_vehicle.id)
+    .bind(serde_json::json!({
+        "vehicle_id": dto.vehicle_id,
+        "auction_id": auction_id
+    }))
+    .execute(pool.get_ref())
+    .await;
+
+    Ok(HttpResponse::Created().json(auction_vehicle))
+}
+
+pub async fn get_auction_vehicles(
+    pool: web::Data<PgPool>,
+    path: web::Path<Uuid>,
+) -> Result<HttpResponse> {
+    let auction_id = path.into_inner();
+    
+    let vehicles = sqlx::query_as::<_, AuctionVehicle>(
+        "SELECT * FROM auction_vehicles WHERE auction_id = $1"
+    )
+    .bind(auction_id)
+    .fetch_all(pool.get_ref())
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+
+    Ok(HttpResponse::Ok().json(vehicles))
+}
+
+pub async fn update_auction_vehicle(
+    pool: web::Data<PgPool>,
+    path: web::Path<Uuid>,
+    dto: web::Json<UpdateAuctionVehicleDto>,
+) -> Result<HttpResponse> {
+    let vehicle_id = path.into_inner();
+    
+    let current: AuctionVehicle = sqlx::query_as(
+        "SELECT * FROM auction_vehicles WHERE id = $1"
+    )
+    .bind(vehicle_id)
+    .fetch_one(pool.get_ref())
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+
+    let detran_status = match &dto.detran_status {
+        Some(s) => s.clone(),
+        None => current.detran_status.clone(),
+    };
+
+    let auction_vehicle = sqlx::query_as::<_, AuctionVehicle>(
+        r#"
+        UPDATE auction_vehicles SET
+            sold_value = COALESCE($1, sold_value),
+            buyer_name = COALESCE($2, buyer_name),
+            buyer_document = COALESCE($3, buyer_document),
+            detran_status = $4,
+            protocol_number = COALESCE($5, protocol_number),
+            detran_protocol = COALESCE($6, detran_protocol),
+            detran_observation = COALESCE($7, detran_observation),
+            detran_request_date = COALESCE($8, detran_request_date),
+            sale_date = COALESCE($9, sale_date)
+        WHERE id = $10
+        RETURNING *
+        "#
+    )
+    .bind(dto.sold_value)
+    .bind(&dto.buyer_name)
+    .bind(&dto.buyer_document)
+    .bind(&detran_status)
+    .bind(&dto.protocol_number)
+    .bind(&dto.detran_protocol)
+    .bind(&dto.detran_observation)
+    .bind(dto.detran_request_date)
+    .bind(dto.sale_date)
+    .bind(vehicle_id)
+    .fetch_one(pool.get_ref())
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+
+    // Registrar histórico se houve mudança de status
+    if current.detran_status != detran_status {
+        let _ = sqlx::query(
+            r#"
+            INSERT INTO auction_history (
+                auction_vehicle_id, action, old_status, new_status, user_name
+            )
+            VALUES ($1, 'ALTERACAO_STATUS_DETRAN', $2, $3, 'Sistema')
+            "#
+        )
+        .bind(auction_vehicle.id)
+        .bind(&current.detran_status)
+        .bind(&detran_status)
+        .execute(pool.get_ref())
+        .await;
+    }
+
+    Ok(HttpResponse::Ok().json(auction_vehicle))
+}
+
+pub async fn remove_vehicle_from_auction(
+    pool: web::Data<PgPool>,
+    path: web::Path<(Uuid, Uuid)>,
+) -> Result<HttpResponse> {
+    let (auction_id, vehicle_id) = path.into_inner();
+    
+    sqlx::query(
+        "DELETE FROM auction_vehicles WHERE auction_id = $1 AND vehicle_id = $2"
+    )
+    .bind(auction_id)
+    .bind(vehicle_id)
+    .execute(pool.get_ref())
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "message": "Veículo removido do leilão com sucesso"
+    })))
+}
+
+// ---------- VEÍCULOS DISPONÍVEIS ----------
+
+pub async fn get_available_vehicles(
+    pool: web::Data<PgPool>,
+) -> Result<HttpResponse> {
+    let vehicles = sqlx::query_as::<_, AvailableVehicle>(
+        r#"
+        SELECT 
+            id,
+            fleet_number,
+            patrimony_name,
+            patrimony_plate,
+            chassi,
+            renavam,
+            model,
+            year,
+            department
+        FROM fleet
+        WHERE auctioned = FALSE AND read_only = FALSE
+        ORDER BY fleet_number
+        "#
+    )
+    .fetch_all(pool.get_ref())
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+
+    Ok(HttpResponse::Ok().json(vehicles))
+}
+
+// ---------- FOTOS ----------
+
+pub async fn upload_vehicle_photo(
+    pool: web::Data<PgPool>,
+    path: web::Path<(Uuid, String)>,
+    _req: HttpRequest,
+) -> Result<HttpResponse> {
+    let (vehicle_id, photo_type) = path.into_inner();
+    
+    let valid_types = vec!["chassi", "plate", "front", "rear", "engine"];
+    if !valid_types.contains(&photo_type.as_str()) {
+        return Ok(HttpResponse::BadRequest().json(serde_json::json!({
+            "error": "Tipo de foto inválido. Use: chassi, plate, front, rear, engine"
+        })));
+    }
+    
+    let photo_path = format!("/uploads/auctions/{}/{}.jpg", vehicle_id, photo_type);
+    
+    let column = format!("{}_photo_path", photo_type);
+    let query = format!(
+        "UPDATE auction_vehicles SET {} = $1 WHERE id = $2",
+        column
+    );
+    
+    sqlx::query(&query)
+        .bind(&photo_path)
+        .bind(vehicle_id)
+        .execute(pool.get_ref())
+        .await
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+    
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "message": "Foto enviada com sucesso",
+        "vehicle_id": vehicle_id,
+        "photo_type": photo_type,
+        "photo_path": photo_path
+    })))
+}
+
+pub async fn get_vehicle_photos(
+    pool: web::Data<PgPool>,
+    path: web::Path<Uuid>,
+) -> Result<HttpResponse> {
+    let vehicle_id = path.into_inner();
+    
+    let vehicle: AuctionVehicle = sqlx::query_as(
+        "SELECT * FROM auction_vehicles WHERE id = $1"
+    )
+    .bind(vehicle_id)
+    .fetch_one(pool.get_ref())
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "chassi": vehicle.chassi_photo_path,
+        "plate": vehicle.plate_photo_path,
+        "front": vehicle.front_photo_path,
+        "rear": vehicle.rear_photo_path,
+        "engine": vehicle.engine_photo_path
+    })))
+}
+
+// ---------- PDF DOCUMENTOS ----------
+
+pub async fn upload_auction_pdf(
+    pool: web::Data<PgPool>,
+    path: web::Path<Uuid>,
+    dto: web::Json<AddPdfDto>,
+) -> Result<HttpResponse> {
+    let auction_id = path.into_inner();
+    
+    let valid_types = vec!["edital", "ata", "termo_entrega", "nota_arrematacao", 
+                           "comprovante_pagamento", "publicacao_oficial", "laudo_avaliacao"];
+    if !valid_types.contains(&dto.document_type.as_str()) {
+        return Ok(HttpResponse::BadRequest().json(serde_json::json!({
+            "error": "Tipo de documento inválido"
+        })));
+    }
+    
+    let file_path = format!("/documents/auctions/{}/{}.pdf", auction_id, dto.document_type);
+    
+    let pdf = sqlx::query_as::<_, AuctionPdf>(
+        r#"
+        INSERT INTO auction_pdfs (
+            auction_id, document_type, file_path, file_name, uploaded_by
+        )
+        VALUES ($1, $2, $3, $4, 'Sistema')
+        RETURNING *
+        "#
+    )
+    .bind(auction_id)
+    .bind(&dto.document_type)
+    .bind(&file_path)
+    .bind(&dto.file_name)
+    .fetch_one(pool.get_ref())
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+
+    Ok(HttpResponse::Created().json(pdf))
+}
+
+pub async fn get_auction_pdfs(
+    pool: web::Data<PgPool>,
+    path: web::Path<Uuid>,
+) -> Result<HttpResponse> {
+    let auction_id = path.into_inner();
+    
+    let pdfs = sqlx::query_as::<_, AuctionPdf>(
+        "SELECT * FROM auction_pdfs WHERE auction_id = $1"
+    )
+    .bind(auction_id)
+    .fetch_all(pool.get_ref())
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+
+    Ok(HttpResponse::Ok().json(pdfs))
+}
+
+// ---------- BAIXA POR LEILÃO ----------
+
+pub async fn finalize_auction(
+    pool: web::Data<PgPool>,
+    path: web::Path<Uuid>,
+    dto: web::Json<FinalizeAuctionDto>,
+) -> Result<HttpResponse> {
+    let auction_id = path.into_inner();
+    
+    let vehicles: Vec<AuctionVehicle> = sqlx::query_as(
+        "SELECT * FROM auction_vehicles WHERE auction_id = $1"
+    )
+    .bind(auction_id)
+    .fetch_all(pool.get_ref())
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+    
+    if vehicles.is_empty() {
+        return Ok(HttpResponse::BadRequest().json(serde_json::json!({
+            "error": "Leilão não possui veículos para finalizar"
+        })));
+    }
+    
+    for vehicle in &vehicles {
+        sqlx::query(
+            r#"
+            UPDATE fleet SET
+                auctioned = TRUE,
+                read_only = TRUE,
+                auction_date = CURRENT_DATE
+            WHERE id = $1
+            "#
+        )
+        .bind(vehicle.vehicle_id)
+        .execute(pool.get_ref())
+        .await
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+        
+        let _ = sqlx::query(
+            r#"
+            INSERT INTO auction_logs (
+                vehicle_id, auction_id, user_name, action, details
+            )
+            VALUES ($1, $2, 'Sistema', 'VEICULO_BAIXADO_POR_LEILAO', $3)
+            "#
+        )
+        .bind(vehicle.vehicle_id)
+        .bind(auction_id)
+        .bind(serde_json::json!({
+            "vehicle_id": vehicle.vehicle_id,
+            "auction_id": auction_id,
+            "sold_value": vehicle.sold_value,
+            "buyer_name": vehicle.buyer_name
+        }))
+        .execute(pool.get_ref())
+        .await;
+    }
+
+    let auction = sqlx::query_as::<_, Auction>(
+        r#"
+        UPDATE auctions SET status = $1
+        WHERE id = $2
+        RETURNING *
+        "#
+    )
+    .bind(&dto.status)
+    .bind(auction_id)
+    .fetch_one(pool.get_ref())
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+
+    Ok(HttpResponse::Ok().json(auction))
+}
+
+// ---------- HISTÓRICO ----------
+
+pub async fn get_auction_history(
+    pool: web::Data<PgPool>,
+    path: web::Path<Uuid>,
+) -> Result<HttpResponse> {
+    let vehicle_id = path.into_inner();
+    
+    let history = sqlx::query_as::<_, AuctionHistory>(
+        "SELECT * FROM auction_history WHERE auction_vehicle_id = $1 ORDER BY created_at DESC"
+    )
+    .bind(vehicle_id)
+    .fetch_all(pool.get_ref())
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+
+    Ok(HttpResponse::Ok().json(history))
+}
+
+pub async fn get_auction_logs(
+    pool: web::Data<PgPool>,
+    query: web::Query<serde_json::Value>,
+) -> Result<HttpResponse> {
+    let vehicle_id = query
+        .get("vehicle_id")
+        .and_then(|v| v.as_str())
+        .and_then(|v| Uuid::parse_str(v).ok());
+
+    let mut sql = String::from("SELECT * FROM auction_logs");
+    let mut params: Vec<String> = vec![];
+
+    if let Some(vehicle) = vehicle_id {
+        sql.push_str(" WHERE vehicle_id = $1");
+        params.push(vehicle.to_string());
+    }
+
+    sql.push_str(" ORDER BY created_at DESC");
+
+    let logs = if let Some(vehicle) = vehicle_id {
+        sqlx::query_as::<_, AuctionLog>(&sql)
+            .bind(vehicle)
+            .fetch_all(pool.get_ref())
+            .await
+    } else {
+        sqlx::query_as::<_, AuctionLog>(&sql)
+            .fetch_all(pool.get_ref())
+            .await
+    }
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+
+    Ok(HttpResponse::Ok().json(logs))
+}
+
+// ---------- RELATÓRIOS ----------
+
+pub async fn get_auctioned_vehicles_report(
+    pool: web::Data<PgPool>,
+    query: web::Query<SearchAuctionVehiclesDto>,
+) -> Result<HttpResponse> {
+    let search = query.search.clone().unwrap_or_default();
+    let status = query.status.clone().unwrap_or_default();
+    
+    let mut sql = String::from(
+        r#"
+        SELECT * FROM vw_auction_full_report
+        WHERE 1=1
+        "#
+    );
+    
+    let mut params: Vec<String> = Vec::new();
+    let mut param_count = 1;
+    
+    if !search.is_empty() {
+        sql.push_str(&format!(
+            " AND (auction_number ILIKE ${} 
+                OR edital_number ILIKE ${} 
+                OR patrimony_plate ILIKE ${} 
+                OR chassi ILIKE ${} 
+                OR buyer_name ILIKE ${})",
+            param_count, param_count, param_count, param_count, param_count
+        ));
+        params.push(format!("%{}%", search));
+        param_count += 1;
+    }
+    
+    if !status.is_empty() {
+        sql.push_str(&format!(" AND auction_status = ${}", param_count));
+        params.push(status);
+    }
+    
+    sql.push_str(" ORDER BY auction_date DESC");
+    
+    let mut query_builder = sqlx::query_as::<_, AuctionFullReport>(&sql);
+    for param in &params {
+        query_builder = query_builder.bind(param);
+    }
+    
+    let vehicles = query_builder
+        .fetch_all(pool.get_ref())
+        .await
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+
+    Ok(HttpResponse::Ok().json(vehicles))
+}
+
+pub async fn get_auctioned_vehicles(
+    pool: web::Data<PgPool>,
+) -> Result<HttpResponse> {
+    let vehicles = sqlx::query_as::<_, AuctionFullReport>(
+        r#"
+        SELECT * FROM vw_auction_full_report
+        WHERE auction_status = 'BAIXA_CONCLUIDA'
+        ORDER BY auction_date DESC
+        "#
+    )
+    .fetch_all(pool.get_ref())
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+
+    Ok(HttpResponse::Ok().json(vehicles))
+}

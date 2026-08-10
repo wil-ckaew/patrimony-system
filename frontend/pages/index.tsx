@@ -1,27 +1,36 @@
-// pages/index.tsx
 import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import PatrimonyList from '../components/PatrimonyList';
 import PatrimonyForm from '../components/PatrimonyForm';
+import BulkPatrimonyForm from '../components/BulkPatrimonyForm';
 import TransferModal from '../components/TransferModal';
 import PrintModal from '../components/PrintModal';
 import Dashboard from '../components/Dashboard';
+import PdfSigner from '../components/PdfSigner';
 import { PatrimonyItem, LoginRequest, CreateUser, User } from '../types/Patrimony';
 import styles from '../components/PatrimonyPage.module.css';
 import { getAuthHeaders } from '../utils/auth';
 import BackupModal from '../components/BackupModal';
+import FleetPrintModal from '../components/FleetPrintModal';
+import PrintMenuModal from '../components/PrintMenuModal';
 
-// ✅ SIMPLIFICADO: Apenas um campo de busca
 interface SearchFilters {
   searchQuery: string;
 }
 
 export default function PatrimonyPage() {
   const [showForm, setShowForm] = useState(false);
+  const [showBulkForm, setShowBulkForm] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showPrintModal, setShowPrintModal] = useState(false);
+  const [showFleetPrintModal, setShowFleetPrintModal] = useState(false);
+  const [showPrintMenu, setShowPrintMenu] = useState(false);
+  const [fleetData, setFleetData] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<any[]>([]);
+  const [sectors, setSectors] = useState<any[]>([]);
   const [showBackupModal, setShowBackupModal] = useState(false);
+  const [showPdfSigner, setShowPdfSigner] = useState(false);
   const [selectedItem, setSelectedItem] = useState<PatrimonyItem | null>(null);
   const [refreshList, setRefreshList] = useState(0);
   const [activeTab, setActiveTab] = useState<'list' | 'dashboard'>('list');
@@ -43,31 +52,67 @@ export default function PatrimonyPage() {
   const [registerError, setRegisterError] = useState('');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   
-  // ✅ SIMPLIFICADO: Apenas um filtro de busca
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({
     searchQuery: ''
   });
   
   const [showSearchPanel, setShowSearchPanel] = useState(false);
 
-  // ✅ Estados para paginação
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
   const [totalItems, setTotalItems] = useState(0);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const userData = localStorage.getItem('user');
-    
-    if (token && userData) {
-      setIsAuthenticated(true);
-      setCurrentUser(JSON.parse(userData));
-    } else {
-      setShowLogin(true);
-    }
+    const initApp = async () => {
+      const token = localStorage.getItem('token');
+      const userData = localStorage.getItem('user');
+
+      if (token && userData) {
+        const user = JSON.parse(userData);
+
+        setIsAuthenticated(true);
+        setCurrentUser(user);
+
+        try {
+          const headers = getAuthHeaders();
+
+          const [fleetRes, patrimonyRes] = await Promise.all([
+            fetch('http://localhost:8080/api/fleet', { headers }),
+            fetch('http://localhost:8080/api/patrimony', { headers })
+          ]);
+
+          if (fleetRes.ok) {
+            const fleetData = await fleetRes.json();
+            setFleetData(fleetData);
+          }
+
+          if (patrimonyRes.ok) {
+            const patrimonyData = await patrimonyRes.json();
+
+            const sectorsSet: Record<string, boolean> = {};
+            const departmentsSet: Record<string, boolean> = {};
+
+            patrimonyData.forEach((item: any) => {
+              if (item.sector) sectorsSet[item.sector] = true;
+              if (item.department) departmentsSet[item.department] = true;
+            });
+
+            setSectors(Object.keys(sectorsSet).sort());
+            setDepartments(Object.keys(departmentsSet).sort());
+          }
+
+        } catch (err) {
+          console.error('Erro ao carregar dados iniciais:', err);
+        }
+
+      } else {
+        setShowLogin(true);
+      }
+    };
+
+    initApp();
   }, []);
 
-  // ✅ Handler para busca
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { value } = e.target;
     setSearchFilters({ searchQuery: value });
@@ -201,7 +246,7 @@ export default function PatrimonyPage() {
   };
 
   const handlePrint = () => {
-    setShowPrintModal(true);
+    setShowPrintMenu(true);
   };
 
   const handleFormClose = () => {
@@ -210,9 +255,18 @@ export default function PatrimonyPage() {
     setRefreshList(prev => prev + 1);
   };
 
+  const handleBulkFormClose = () => {
+    setShowBulkForm(false);
+    setRefreshList(prev => prev + 1);
+  };
+
   const handleRefresh = () => setRefreshList(prev => prev + 1);
 
-  // ✅ Funções para paginação
+  const handlePdfSigned = (file: File) => {
+    console.log('📄 PDF assinado:', file.name);
+    alert(`✅ PDF "${file.name}" assinado com sucesso!`);
+  };
+
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -455,11 +509,11 @@ export default function PatrimonyPage() {
           <div className={styles.actionMenu}>
             <button 
               className={`${styles.btn} ${styles.btnPrimary}`}
-              onClick={() => setShowForm(true)}
-              title="Adicionar novo bem patrimonial"
+              onClick={() => setShowPdfSigner(true)}
+              title="Assinar PDF digitalmente"
             >
-              <span className={styles.btnIcon}>+</span>
-              Novo Bem
+              <span className={styles.btnIcon}>✍️</span>
+              Assinar PDF
             </button>
 
             <button 
@@ -482,9 +536,21 @@ export default function PatrimonyPage() {
               </span>
             </Link>
 
+            {/* ✅ BOTÃO PARA LEILÕES - ADICIONADO */}
+            <Link href="/leiloes">
+              <span 
+                className={`${styles.btn} ${styles.btnSecondary}`} 
+                title="Ir para o módulo de Leilões"
+                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}
+              >
+                <span className={styles.btnIcon}>🏷️</span>
+                Leilões
+              </span>
+            </Link>
+
             {currentUser?.role === 'admin' && (
               <button 
-                className={`${styles.btn} ${styles.btnSuccess}`}
+                className={`${styles.btn} ${styles.btnNeutral}`}
                 onClick={() => setShowBackupModal(true)}
                 title="Gerenciar backups"
               >
@@ -525,6 +591,26 @@ export default function PatrimonyPage() {
             Dashboard
           </button>
           
+          <div className={styles.tabActions}>
+            <button 
+              className={`${styles.btn} ${styles.btnPrimary}`}
+              onClick={() => setShowForm(true)}
+              title="Adicionar novo bem patrimonial"
+            >
+              <span className={styles.btnIcon}>+</span>
+              Novo Bem
+            </button>
+
+            <button 
+              className={`${styles.btn} ${styles.btnSuccess}`}
+              onClick={() => setShowBulkForm(true)}
+              title="Cadastrar vários bens de uma vez"
+            >
+              <span className={styles.btnIcon}>📦</span>
+              Cadastro em Massa
+            </button>
+          </div>
+
           <div className={styles.tabFilter}>
             <button 
               className={styles.filterToggle}
@@ -539,7 +625,6 @@ export default function PatrimonyPage() {
           </div>
         </nav>
 
-        {/* ✅ Painel de busca único */}
         {showSearchPanel && activeTab === 'list' && (
           <div className={styles.filterPanel}>
             <div className={styles.searchBar}>
@@ -655,6 +740,8 @@ export default function PatrimonyPage() {
 
       {showForm && <PatrimonyForm item={selectedItem} onClose={handleFormClose} onRefresh={handleRefresh} />}
 
+      {showBulkForm && <BulkPatrimonyForm onClose={handleBulkFormClose} onRefresh={handleRefresh} />}
+
       {showTransferModal && selectedItem && (
         <TransferModal
           item={selectedItem}
@@ -664,13 +751,51 @@ export default function PatrimonyPage() {
 
       {showPrintModal && (
         <PrintModal
-          filters={{ searchQuery: searchFilters.searchQuery }}
+          filters={searchFilters}
           onClose={() => setShowPrintModal(false)}
         />
       )}
 
+      {showFleetPrintModal && (
+        <FleetPrintModal
+          fleet={fleetData}
+          departments={departments}
+          sectors={sectors}
+          onClose={() => setShowFleetPrintModal(false)}
+        />
+      )}
+
+      {showPrintMenu && (
+        <PrintMenuModal
+          onClose={() => setShowPrintMenu(false)}
+          onPatrimony={() => {
+            setShowPrintMenu(false);
+            setShowPrintModal(true);
+          }}
+          onFleet={() => {
+            setShowPrintMenu(false);
+            setShowFleetPrintModal(true);
+          }}
+        />
+      )}
+
+      {showFleetPrintModal && (
+        <FleetPrintModal
+          onClose={() => setShowFleetPrintModal(false)}
+          fleet={fleetData}
+          departments={departments}
+          sectors={sectors}
+        />
+      )}
       {showBackupModal && (
         <BackupModal onClose={() => setShowBackupModal(false)} />
+      )}
+
+      {showPdfSigner && (
+        <PdfSigner
+          onClose={() => setShowPdfSigner(false)}
+          onSigned={handlePdfSigned}
+        />
       )}
     </div>   
   );

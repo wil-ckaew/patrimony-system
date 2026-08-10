@@ -555,3 +555,143 @@
     height: 80px;
   }
 }
+
+/* ========================================
+   PATRIMÔNIO NÚMERO EM DESTAQUE - EXTRA GRANDE
+======================================== */
+
+.patrimonyNumberHighlight {
+  background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+  border-radius: 24px;
+  padding: 1.5rem 1rem;
+  text-align: center;
+  width: 100%;
+  margin-top: 1rem;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.3);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.patrimonyNumberHighlight:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 32px rgba(37, 99, 235, 0.4);
+}
+
+.patrimonyNumberLabel {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  color: rgba(255, 255, 255, 0.9);
+  margin-bottom: 0.6rem;
+}
+
+.patrimonyNumberValue {
+  display: block;
+  font-size: 3rem;
+  font-weight: 900;
+  color: white;
+  line-height: 1.2;
+  word-break: break-word;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  letter-spacing: 2px;
+}
+
+/* Responsivo para tablet */
+@media (max-width: 768px) {
+  .patrimonyNumberValue {
+    font-size: 2.5rem;
+  }
+  
+  .patrimonyNumberHighlight {
+    padding: 1.2rem 0.8rem;
+    border-radius: 20px;
+  }
+  
+  .patrimonyNumberLabel {
+    font-size: 0.75rem;
+    letter-spacing: 2px;
+  }
+}
+
+/* Responsivo para mobile */
+@media (max-width: 480px) {
+  .patrimonyNumberValue {
+    font-size: 2rem;
+  }
+  
+  .patrimonyNumberHighlight {
+    padding: 1rem 0.6rem;
+    border-radius: 18px;
+  }
+  
+  .patrimonyNumberLabel {
+    font-size: 0.7rem;
+    letter-spacing: 1.5px;
+    margin-bottom: 0.4rem;
+  }
+}
+
+/* Responsivo para altura limitada */
+@media (max-height: 700px) {
+  .patrimonyNumberValue {
+    font-size: 1.8rem;
+  }
+  
+  .patrimonyNumberHighlight {
+    padding: 0.8rem 0.6rem;
+    margin-top: 0.5rem;
+  }
+  
+  .patrimonyNumberLabel {
+    font-size: 0.65rem;
+    margin-bottom: 0.3rem;
+  }
+}
+
+/* PatrimonyList.module.css - Adicione estes estilos */
+
+.fleetBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #dbeafe;
+    color: #1e40af;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.fleetNotesText {
+    color: #475569;
+    font-size: 13px;
+    max-width: 200px;
+    display: inline-block;
+    white-space: normal;
+    word-break: break-word;
+}
+
+.emptyValue {
+    color: #94a3b8;
+    font-size: 13px;
+}
+
+/* Na seção expandida */
+.orgDetail .fleetBadge {
+    background: #dbeafe;
+    color: #1e40af;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 13px;
+    margin-left: 4px;
+}
+
+.orgDetail .fleetNotesText {
+    background: #f1f5f9;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 13px;
+    color: #1e293b;
+    margin-left: 4px;
+}

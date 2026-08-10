@@ -24,3 +24,4 @@ jsonwebtoken = "9.3.1"
 bcrypt = "0.17.1"
 url = "2"
 lopdf = "0.31"  # Para ler PDFs
+flate2 = "1.0"

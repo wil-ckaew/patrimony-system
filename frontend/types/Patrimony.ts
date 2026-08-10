@@ -1,4 +1,6 @@
 // types/Patrimony.ts
+// types/Patrimony.ts
+
 export interface PatrimonyItem {
   id: string;
   plate: string;
@@ -21,29 +23,34 @@ export interface PatrimonyItem {
   createdBy?: string;
   createdAt: string;
   updatedAt: string;
-  isVehicle?: boolean; // indica se o bem é um veículo
-  
-  // NOVO: Lista de pares (Nota Fiscal + Empenho) para suportar múltiplos documentos
+  isVehicle?: boolean;
   fiscalDocuments?: FiscalDocument[];
+  // ✅ ADICIONE OS NOVOS CAMPOS
+  fleetNumber?: string;
+  fleetNotes?: string;
 }
 
-// NOVA INTERFACE: Representa um par de Nota Fiscal e Empenho
+// =========================
+// DOCUMENTOS FISCAIS
+// =========================
 export interface FiscalDocument {
-  id?: string;                 // Identificador único (opcional para novos)
-  invoiceNumber: string;      // Número da Nota Fiscal
-  invoiceFile?: string;       // URL do arquivo da NF
-  invoiceFileName?: string;   // Nome original do arquivo
-  commitmentNumber: string;   // Número do Empenho
-  commitmentFile?: string;    // URL do arquivo do Empenho
+  id?: string;
+  invoiceNumber: string;
+  invoiceFile?: string;
+  invoiceFileName?: string;
+  commitmentNumber: string;
+  commitmentFile?: string;
   commitmentFileName?: string;
-  issueDate?: string;         // Data de emissão da NF (opcional)
-  isLegacy?: boolean;         // Indica se veio do sistema antigo (para compatibilidade)
-  
-  // Campos internos para upload (não enviar ao backend)
+  issueDate?: string;
+  isLegacy?: boolean;
+
   _invoiceFile?: File;
   _commitmentFile?: File;
 }
 
+// =========================
+// TRANSFERÊNCIA
+// =========================
 export interface TransferRequest {
   patrimonyId: string;
   fromDepartment: string;
@@ -51,6 +58,9 @@ export interface TransferRequest {
   reason: string;
 }
 
+// =========================
+// DEPARTAMENTO
+// =========================
 export interface Department {
   id: string;
   name: string;
@@ -74,6 +84,9 @@ export interface Stats {
   byDepartment: DepartmentStats[];
 }
 
+// =========================
+// USUÁRIO
+// =========================
 export interface User {
   id: string;
   username: string;
@@ -104,6 +117,9 @@ export interface LoginRequest {
   password: string;
 }
 
+// =========================
+// FORMULÁRIO
+// =========================
 export interface PatrimonyFormData {
   plate: string;
   name: string;
@@ -121,19 +137,34 @@ export interface PatrimonyFormData {
   is_vehicle?: boolean;
 }
 
+// =========================
+// 🚨 FROTA CORRIGIDA (IMPORTANTE)
+// =========================
 export interface FleetItem {
   id: string;
+
   fleet_number: string;
   patrimony_id: string;
+
+  // 👇 nomes corretos usados no print
   patrimony_plate?: string;
   patrimony_name?: string;
-  patrimony_description?: string; // ✅ Adicionar este campo
+  patrimony_description?: string;
+
   department: string;
+
+  // 👇 AGORA EXISTE PARA NÃO QUEBRAR SEU PRINT
+  sector?: string;
+
   notes?: string;
+
   created_at: string;
   updated_at: string;
 }
 
+// =========================
+// FORM FROTA
+// =========================
 export interface FleetFormData {
   fleetNumber: string;
   patrimonyId: string;
@@ -141,12 +172,18 @@ export interface FleetFormData {
   notes: string;
 }
 
+// =========================
+// ERRO API
+// =========================
 export interface ApiError {
   message: string;
   field?: string;
   type?: string;
 }
 
+// =========================
+// FILTROS
+// =========================
 export interface SearchFilters {
   plate: string;
   name: string;
