@@ -113,3 +113,27 @@ coverage/
 *.zip
 *.rar
 *.7z
+
+# Backups e cópias
+*.bak
+*.bak*
+* copy*
+*_copy*
+*Cópia*
+*erradocopy*
+*_errado*
+handlers_copy*
+mod_copy*
+patrimony_*copy*
+
+# Arquivos temporários do backend
+backend/src/handlers/*.bak*
+backend/src/handlers/*copy*
+backend/src/main copy*
+
+# Arquivos temporários do frontend
+frontend/components/*copy*
+frontend/components/*bak*
+frontend/components/PrintModal_copy*
+frontend/components/PatrimonyForm_copy*
+frontend/components/PatrimonyList_copy*
