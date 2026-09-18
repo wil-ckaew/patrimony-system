@@ -1,8 +1,0 @@
-target/
-.git/
-.gitignore
-*.log
-.env
-Dockerfile
-docker-compose.yml
-uploads/  # não copiar a pasta uploads para a imagem

@@ -1,6 +1,7 @@
 // components/BulkPatrimonyForm.tsx
 import React, { useState, useEffect } from 'react';
 import { getAuthHeaders } from '../utils/auth';
+import { apiUrl, BACKEND_BASE_URL } from '../lib/api';
 
 interface FiscalDocument {
   id: string;
@@ -45,6 +46,7 @@ export default function BulkPatrimonyForm({ onClose, onRefresh }: BulkPatrimonyF
   const [newDocInvoice, setNewDocInvoice] = useState('');
   const [newDocCommitment, setNewDocCommitment] = useState('');
   const [newDocIssueDate, setNewDocIssueDate] = useState('');
+  const [newDocDenfSe, setNewDocDenfSe] = useState(''); // NOVO: DENF/SE
   const [newDocInvoiceFile, setNewDocInvoiceFile] = useState<File | null>(null);
   const [newDocCommitmentFile, setNewDocCommitmentFile] = useState<File | null>(null);
   const [showFiscalSection, setShowFiscalSection] = useState(false);
@@ -52,40 +54,17 @@ export default function BulkPatrimonyForm({ onClose, onRefresh }: BulkPatrimonyF
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
 
-  // 🔄 EFEITO PARA PREENCHER AUTOMATICAMENTE OS CAMPOS DOS DOCUMENTOS FISCAIS
+  // 🔄 EFEITO PARA PREENCHER OS CAMPOS DO NOVO DOCUMENTO COM OS DADOS FISCAIS
   useEffect(() => {
-    // Quando a seção for aberta, preencher com os dados atuais
     if (showFiscalSection) {
-      setNewDocInvoice(formData.invoice_number || '');
-      setNewDocCommitment(formData.commitment_number || '');
-      setNewDocIssueDate(formData.nf_issue_date || '');
-    }
-  }, [showFiscalSection, formData.invoice_number, formData.commitment_number, formData.nf_issue_date]);
-
-  // 🔄 EFEITO PARA CRIAR DOCUMENTO FISCAL AUTOMATICAMENTE
-  useEffect(() => {
-    if (formData.invoice_number.trim() && formData.commitment_number.trim()) {
-      const exists = fiscalDocuments.some(
-        doc => doc.invoiceNumber === formData.invoice_number.trim() && 
-               doc.commitmentNumber === formData.commitment_number.trim()
-      );
-      
-      if (!exists && fiscalDocuments.length === 0) {
-        const newDoc: FiscalDocument = {
-          id: Date.now().toString(),
-          invoiceNumber: formData.invoice_number.trim(),
-          commitmentNumber: formData.commitment_number.trim(),
-          issueDate: formData.nf_issue_date || '',
-          invoiceFile: null,
-          commitmentFile: null,
-          _invoiceFile: undefined,
-          _commitmentFile: undefined,
-        };
-        setFiscalDocuments([newDoc]);
-        console.log('📋 Documento fiscal criado automaticamente:', newDoc);
+      if (fiscalDocuments.length === 0) {
+        setNewDocInvoice(formData.invoice_number || '');
+        setNewDocCommitment(formData.commitment_number || '');
+        setNewDocIssueDate(formData.nf_issue_date || '');
+        setNewDocDenfSe(formData.denf_se_number || ''); // NOVO: DENF/SE
       }
     }
-  }, [formData.invoice_number, formData.commitment_number, formData.nf_issue_date]);
+  }, [showFiscalSection]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
@@ -100,6 +79,18 @@ export default function BulkPatrimonyForm({ onClose, onRefresh }: BulkPatrimonyF
       alert('Preencha o número da NF e do Empenho');
       return;
     }
+
+    // Verifica se já existe documento com os mesmos dados
+    const exists = fiscalDocuments.some(
+      doc => doc.invoiceNumber === newDocInvoice.trim() && 
+             doc.commitmentNumber === newDocCommitment.trim()
+    );
+
+    if (exists) {
+      alert('Este par NF/Empenho já foi adicionado!');
+      return;
+    }
+
     const newDoc: FiscalDocument = {
       id: Date.now().toString(),
       invoiceNumber: newDocInvoice.trim(),
@@ -111,9 +102,12 @@ export default function BulkPatrimonyForm({ onClose, onRefresh }: BulkPatrimonyF
       _commitmentFile: newDocCommitmentFile || undefined,
     };
     setFiscalDocuments([...fiscalDocuments, newDoc]);
+    
+    // Limpa os campos
     setNewDocInvoice('');
     setNewDocCommitment('');
     setNewDocIssueDate('');
+    setNewDocDenfSe('');
     setNewDocInvoiceFile(null);
     setNewDocCommitmentFile(null);
   };
@@ -122,7 +116,12 @@ export default function BulkPatrimonyForm({ onClose, onRefresh }: BulkPatrimonyF
     const updated = [...fiscalDocuments];
     updated.splice(index, 1);
     setFiscalDocuments(updated);
-    if (updated.length === 0) setShowFiscalSection(false);
+    if (updated.length === 0) {
+      setNewDocInvoice(formData.invoice_number || '');
+      setNewDocCommitment(formData.commitment_number || '');
+      setNewDocIssueDate(formData.nf_issue_date || '');
+      setNewDocDenfSe(formData.denf_se_number || '');
+    }
   };
 
   const updateFiscalDocument = (index: number, field: keyof FiscalDocument, value: any) => {
@@ -154,7 +153,7 @@ export default function BulkPatrimonyForm({ onClose, onRefresh }: BulkPatrimonyF
     
     let url = '';
     if (type === 'image') {
-      url = `http://localhost:8080/api/patrimony/${patrimonyId}/image`;
+      url = apiUrl(`/patrimony/${patrimonyId}/image`);
     } else {
       const docType = type === 'invoice' ? 'invoice' : 'commitment';
       let queryParams = '';
@@ -164,7 +163,7 @@ export default function BulkPatrimonyForm({ onClose, onRefresh }: BulkPatrimonyF
         if (docInfo.commitmentNumber) params.append('commitment_number', docInfo.commitmentNumber);
         queryParams = `?${params.toString()}`;
       }
-      url = `http://localhost:8080/api/patrimony/${patrimonyId}/document/${docType}${queryParams}`;
+      url = apiUrl(`/patrimony/${patrimonyId}/document/${docType}${queryParams}`);
     }
     
     const response = await fetch(url, {
@@ -254,7 +253,6 @@ export default function BulkPatrimonyForm({ onClose, onRefresh }: BulkPatrimonyF
     setUploadProgress({ current: 0, total: 0 });
     
     try {
-      // 🔑 PAYLOAD COM TODOS OS CAMPOS
       const payload = {
         start_plate: start,
         end_plate: end,
@@ -275,7 +273,7 @@ export default function BulkPatrimonyForm({ onClose, onRefresh }: BulkPatrimonyF
 
       console.log('📦 Enviando dados em massa:', JSON.stringify(payload, null, 2));
       
-      const response = await fetch('http://localhost:8080/api/patrimony/bulk', {
+      const response = await fetch(apiUrl('/patrimony/bulk'), {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(payload)
@@ -334,7 +332,8 @@ export default function BulkPatrimonyForm({ onClose, onRefresh }: BulkPatrimonyF
 
   const departments = [
     'Educação', 'Saúde', 'Administração', 'Urbanismo', 
-    'Cultura', 'Esportes', 'Transporte', 'Finanças'
+    'Cultura', 'Esportes', 'Transporte', 'Finanças',
+    'Instituto Profissões'
   ];
 
   const styles = {
@@ -710,7 +709,7 @@ export default function BulkPatrimonyForm({ onClose, onRefresh }: BulkPatrimonyF
             </div>
           </div>
 
-          {/* 🔑 CAMPOS DE NF E EMPENHO COM PREENCHIMENTO AUTOMÁTICO */}
+          {/* 🔑 CAMPOS DE NF E EMPENHO COM DENF/SE */}
           <div style={{ ...styles.sectionCard, background: '#eff6ff', borderColor: '#3b82f6' }}>
             <div style={styles.sectionTitle}>📋 Dados Fiscais</div>
             <div style={styles.formRow}>
@@ -760,20 +759,44 @@ export default function BulkPatrimonyForm({ onClose, onRefresh }: BulkPatrimonyF
                 />
               </div>
             </div>
+            {/* NOVO CAMPO: N° DENF/SE */}
+            <div style={styles.formRow}>
+              <div style={styles.formGroup}>
+                <label style={styles.formLabel}>N° DENF/SE</label>
+                <input
+                  type="text"
+                  name="denf_se_number"
+                  value={formData.denf_se_number}
+                  onChange={handleInputChange}
+                  style={styles.formInput}
+                  placeholder="Número DENF/SE"
+                />
+              </div>
+              <div></div>
+            </div>
             {formData.invoice_number && formData.commitment_number && (
               <div style={{ marginTop: '8px', padding: '8px', background: '#e8f5e9', borderRadius: '8px' }}>
                 <small style={{ color: '#2e7d32' }}>
                   ✅ Dados preenchidos: NF {formData.invoice_number} / Empenho {formData.commitment_number}
+                  {formData.denf_se_number && ` / DENF/SE ${formData.denf_se_number}`}
                 </small>
               </div>
             )}
           </div>
 
-          {/* SEÇÃO DE MÚLTIPLOS DOCUMENTOS FISCAIS */}
+          {/* SEÇÃO DE DOCUMENTOS FISCAIS ADICIONAIS */}
           <div style={styles.sectionCard}>
             <button
               type="button"
-              onClick={() => setShowFiscalSection(!showFiscalSection)}
+              onClick={() => {
+                setShowFiscalSection(!showFiscalSection);
+                if (!showFiscalSection && fiscalDocuments.length === 0) {
+                  setNewDocInvoice(formData.invoice_number || '');
+                  setNewDocCommitment(formData.commitment_number || '');
+                  setNewDocIssueDate(formData.nf_issue_date || '');
+                  setNewDocDenfSe(formData.denf_se_number || '');
+                }
+              }}
               style={styles.toggleButton}
             >
               {showFiscalSection ? '📋 ▼' : '📋 ▶'} Documentos Fiscais Adicionais (NF + Empenho)
@@ -784,6 +807,9 @@ export default function BulkPatrimonyForm({ onClose, onRefresh }: BulkPatrimonyF
               <>
                 <div style={{ marginTop: '16px' }}>
                   <div style={styles.addSection}>
+                    <h5 style={{ margin: '0 0 12px 0', color: '#1e40af' }}>
+                      ➕ Adicionar Novo Documento Fiscal
+                    </h5>
                     <div style={styles.formRow}>
                       <div style={styles.formGroup}>
                         <label style={styles.formLabel}>Nº Nota Fiscal</label>
@@ -816,7 +842,16 @@ export default function BulkPatrimonyForm({ onClose, onRefresh }: BulkPatrimonyF
                           style={styles.formInput}
                         />
                       </div>
-                      <div></div>
+                      <div style={styles.formGroup}>
+                        <label style={styles.formLabel}>N° DENF/SE</label>
+                        <input
+                          type="text"
+                          value={newDocDenfSe}
+                          onChange={(e) => setNewDocDenfSe(e.target.value)}
+                          placeholder="Número DENF/SE"
+                          style={styles.formInput}
+                        />
+                      </div>
                     </div>
                     <div style={styles.formRow}>
                       <div style={styles.formGroup}>
@@ -844,80 +879,87 @@ export default function BulkPatrimonyForm({ onClose, onRefresh }: BulkPatrimonyF
                   </div>
                 </div>
                 
-                {fiscalDocuments.map((doc, idx) => (
-                  <div key={doc.id} style={styles.docCard}>
-                    <div style={styles.docHeader}>
-                      <strong>📄 Documento Fiscal Adicional #{idx + 1}</strong>
-                      <button type="button" onClick={() => removeFiscalDocument(idx)} style={styles.removeButton}>
-                        Remover
-                      </button>
-                    </div>
-                    <div style={styles.formRow}>
-                      <div style={styles.formGroup}>
-                        <label style={styles.formLabel}>Nº Nota Fiscal</label>
-                        <input
-                          type="text"
-                          value={doc.invoiceNumber}
-                          onChange={(e) => updateFiscalDocument(idx, 'invoiceNumber', e.target.value)}
-                          style={styles.formInput}
-                        />
+                {fiscalDocuments.length > 0 && (
+                  <>
+                    <h5 style={{ margin: '16px 0 12px 0', color: '#475569' }}>
+                      📄 Documentos Adicionados ({fiscalDocuments.length})
+                    </h5>
+                    {fiscalDocuments.map((doc, idx) => (
+                      <div key={doc.id} style={styles.docCard}>
+                        <div style={styles.docHeader}>
+                          <strong>📄 Documento Fiscal #{idx + 1}</strong>
+                          <button type="button" onClick={() => removeFiscalDocument(idx)} style={styles.removeButton}>
+                            Remover
+                          </button>
+                        </div>
+                        <div style={styles.formRow}>
+                          <div style={styles.formGroup}>
+                            <label style={styles.formLabel}>Nº Nota Fiscal</label>
+                            <input
+                              type="text"
+                              value={doc.invoiceNumber}
+                              onChange={(e) => updateFiscalDocument(idx, 'invoiceNumber', e.target.value)}
+                              style={styles.formInput}
+                            />
+                          </div>
+                          <div style={styles.formGroup}>
+                            <label style={styles.formLabel}>Nº Empenho</label>
+                            <input
+                              type="text"
+                              value={doc.commitmentNumber}
+                              onChange={(e) => updateFiscalDocument(idx, 'commitmentNumber', e.target.value)}
+                              style={styles.formInput}
+                            />
+                          </div>
+                        </div>
+                        <div style={styles.formRow}>
+                          <div style={styles.formGroup}>
+                            <label style={styles.formLabel}>Data Emissão NF</label>
+                            <input
+                              type="date"
+                              value={doc.issueDate}
+                              onChange={(e) => updateFiscalDocument(idx, 'issueDate', e.target.value)}
+                              style={styles.formInput}
+                            />
+                          </div>
+                          <div></div>
+                        </div>
+                        <div style={styles.formRow}>
+                          <div style={styles.formGroup}>
+                            <label style={styles.formLabel}>Arquivo NF</label>
+                            <input
+                              type="file"
+                              accept=".pdf,image/*"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0] || null;
+                                if (file) handleDocInvoiceFileChange(idx, file);
+                              }}
+                              style={styles.formInput}
+                            />
+                            {doc._invoiceFile && (
+                              <div style={styles.filePreview}>📎 {doc._invoiceFile.name}</div>
+                            )}
+                          </div>
+                          <div style={styles.formGroup}>
+                            <label style={styles.formLabel}>Arquivo Empenho</label>
+                            <input
+                              type="file"
+                              accept=".pdf,image/*"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0] || null;
+                                if (file) handleDocCommitmentFileChange(idx, file);
+                              }}
+                              style={styles.formInput}
+                            />
+                            {doc._commitmentFile && (
+                              <div style={styles.filePreview}>📎 {doc._commitmentFile.name}</div>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <div style={styles.formGroup}>
-                        <label style={styles.formLabel}>Nº Empenho</label>
-                        <input
-                          type="text"
-                          value={doc.commitmentNumber}
-                          onChange={(e) => updateFiscalDocument(idx, 'commitmentNumber', e.target.value)}
-                          style={styles.formInput}
-                        />
-                      </div>
-                    </div>
-                    <div style={styles.formRow}>
-                      <div style={styles.formGroup}>
-                        <label style={styles.formLabel}>Data Emissão NF</label>
-                        <input
-                          type="date"
-                          value={doc.issueDate}
-                          onChange={(e) => updateFiscalDocument(idx, 'issueDate', e.target.value)}
-                          style={styles.formInput}
-                        />
-                      </div>
-                      <div></div>
-                    </div>
-                    <div style={styles.formRow}>
-                      <div style={styles.formGroup}>
-                        <label style={styles.formLabel}>Arquivo NF</label>
-                        <input
-                          type="file"
-                          accept=".pdf,image/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0] || null;
-                            if (file) handleDocInvoiceFileChange(idx, file);
-                          }}
-                          style={styles.formInput}
-                        />
-                        {doc._invoiceFile && (
-                          <div style={styles.filePreview}>📎 {doc._invoiceFile.name}</div>
-                        )}
-                      </div>
-                      <div style={styles.formGroup}>
-                        <label style={styles.formLabel}>Arquivo Empenho</label>
-                        <input
-                          type="file"
-                          accept=".pdf,image/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0] || null;
-                            if (file) handleDocCommitmentFileChange(idx, file);
-                          }}
-                          style={styles.formInput}
-                        />
-                        {doc._commitmentFile && (
-                          <div style={styles.filePreview}>📎 {doc._commitmentFile.name}</div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                    ))}
+                  </>
+                )}
                 
                 <p style={{ fontSize: '12px', color: '#f59e0b', marginTop: '12px', textAlign: 'center' }}>
                   ⚠️ Todos os documentos adicionais serão anexados a TODOS os {totalItems} itens da faixa

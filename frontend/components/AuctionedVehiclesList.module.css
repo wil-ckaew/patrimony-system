@@ -1,0 +1,318 @@
+.container {
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding: 0 0.5rem;
+}
+
+.header h2 {
+  margin: 0;
+  color: #0f172a;
+}
+
+.total {
+  background: #e2e8f0;
+  padding: 0.4rem 1rem;
+  border-radius: 20px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.tableContainer {
+  overflow-x: auto;
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.table th {
+  background: #f8fafc;
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-weight: 700;
+  color: #475569;
+  border-bottom: 2px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+
+.row {
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.row:hover {
+  background: #f8fafc;
+}
+
+.auctioned {
+  opacity: 0.75;
+  background: #f1f5f9;
+}
+
+.auctioned .fleetNumber {
+  color: #64748b;
+}
+
+.auctioned .vehicleName {
+  color: #475569;
+}
+
+.auctioned .plate {
+  color: #475569;
+}
+
+.lockIcon {
+  margin-right: 0.5rem;
+}
+
+.fleetNumber {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.vehicleName {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.modelBadge {
+  background: #dbeafe;
+  color: #1d4ed8;
+  padding: 0.15rem 0.6rem;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.plate {
+  font-family: monospace;
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 1rem;
+}
+
+.auctionInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.auctionNumber {
+  font-weight: 600;
+  color: #0f172a;
+  font-size: 0.85rem;
+}
+
+.auctionDate {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.statusBadge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.statusBadge.em_preparacao {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.statusBadge.publicado {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.statusBadge.realizado {
+  background: #e0e7ff;
+  color: #4338ca;
+}
+
+.statusBadge.finalizado {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.statusBadge.baixa_concluida {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.detranBadge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: white;
+}
+
+.value {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.buyer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.documentBadge {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  font-family: monospace;
+}
+
+.expandedRow {
+  background: #f8fafc;
+}
+
+.expandedRow td {
+  padding: 1.5rem;
+}
+
+.expandedContent {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  border: 1px solid #e2e8f0;
+}
+
+.detailGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 2rem;
+}
+
+.detailSection h4 {
+  margin: 0 0 1rem 0;
+  color: #0f172a;
+  font-size: 1rem;
+}
+
+.detailItem {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 0.9rem;
+}
+
+.detailItem:last-child {
+  border-bottom: none;
+}
+
+.label {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.mono {
+  font-family: monospace;
+  font-size: 0.85rem;
+}
+
+.valueHighlight {
+  font-weight: 700;
+  color: #059669;
+}
+
+.detranBadgeLarge {
+  display: inline-block;
+  padding: 0.3rem 0.8rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: white;
+}
+
+.emptyState {
+  text-align: center;
+  padding: 3rem;
+  color: #64748b;
+  background: white;
+  border-radius: 12px;
+  border: 1px dashed #cbd5e1;
+}
+
+.loading, .error {
+  text-align: center;
+  padding: 2rem;
+  font-size: 1.1rem;
+}
+
+.loading {
+  color: #64748b;
+}
+
+.error {
+  color: #ef4444;
+}
+
+@media (max-width: 768px) {
+  .detailGrid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  .table {
+    font-size: 0.8rem;
+  }
+  
+  .table th,
+  .table td {
+    padding: 0.5rem 0.75rem;
+  }
+  
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .table {
+    font-size: 0.7rem;
+  }
+  
+  .table th,
+  .table td {
+    padding: 0.4rem 0.5rem;
+  }
+  
+  .expandedRow td {
+    padding: 0.75rem;
+  }
+  
+  .expandedContent {
+    padding: 0.75rem;
+  }
+  
+  .detailItem {
+    font-size: 0.8rem;
+  }
+}

@@ -1,4 +1,3 @@
-// frontend/pages/index.tsx
 import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
@@ -8,15 +7,15 @@ import BulkPatrimonyForm from '../components/BulkPatrimonyForm';
 import TransferModal from '../components/TransferModal';
 import PrintModal from '../components/PrintModal';
 import Dashboard from '../components/Dashboard';
-import PdfSigner from '../components/PdfSigner'; // ✅ ADICIONADO
+import PdfSigner from '../components/PdfSigner';
 import { PatrimonyItem, LoginRequest, CreateUser, User } from '../types/Patrimony';
 import styles from '../components/PatrimonyPage.module.css';
 import { getAuthHeaders } from '../utils/auth';
 import BackupModal from '../components/BackupModal';
 import FleetPrintModal from '../components/FleetPrintModal';
 import PrintMenuModal from '../components/PrintMenuModal';
+import { apiUrl, BACKEND_BASE_URL } from '../lib/api';
 
-// ✅ SIMPLIFICADO: Apenas um campo de busca
 interface SearchFilters {
   searchQuery: string;
 }
@@ -32,7 +31,7 @@ export default function PatrimonyPage() {
   const [departments, setDepartments] = useState<any[]>([]);
   const [sectors, setSectors] = useState<any[]>([]);
   const [showBackupModal, setShowBackupModal] = useState(false);
-  const [showPdfSigner, setShowPdfSigner] = useState(false); // ✅ ADICIONADO
+  const [showPdfSigner, setShowPdfSigner] = useState(false);
   const [selectedItem, setSelectedItem] = useState<PatrimonyItem | null>(null);
   const [refreshList, setRefreshList] = useState(0);
   const [activeTab, setActiveTab] = useState<'list' | 'dashboard'>('list');
@@ -54,14 +53,12 @@ export default function PatrimonyPage() {
   const [registerError, setRegisterError] = useState('');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   
-  // ✅ SIMPLIFICADO: Apenas um filtro de busca
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({
     searchQuery: ''
   });
   
   const [showSearchPanel, setShowSearchPanel] = useState(false);
 
-  // ✅ Estados para paginação
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
   const [totalItems, setTotalItems] = useState(0);
@@ -77,13 +74,12 @@ export default function PatrimonyPage() {
         setIsAuthenticated(true);
         setCurrentUser(user);
 
-        // 🔥 já carrega dados necessários para print/frota
         try {
           const headers = getAuthHeaders();
 
           const [fleetRes, patrimonyRes] = await Promise.all([
-            fetch('http://localhost:8080/api/fleet', { headers }),
-            fetch('http://localhost:8080/api/patrimony', { headers })
+            fetch(apiUrl('/fleet'), { headers }),
+            fetch(apiUrl('/patrimony'), { headers })
           ]);
 
           if (fleetRes.ok) {
@@ -94,7 +90,6 @@ export default function PatrimonyPage() {
           if (patrimonyRes.ok) {
             const patrimonyData = await patrimonyRes.json();
 
-            // 🔥 extrai departamentos e setores já no load inicial
             const sectorsSet: Record<string, boolean> = {};
             const departmentsSet: Record<string, boolean> = {};
 
@@ -119,7 +114,6 @@ export default function PatrimonyPage() {
     initApp();
   }, []);
 
-  // ✅ Handler para busca
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { value } = e.target;
     setSearchFilters({ searchQuery: value });
@@ -148,7 +142,7 @@ export default function PatrimonyPage() {
         password: loginData.password
       };
 
-      const response = await fetch('http://localhost:8080/api/login', {
+      const response = await fetch(apiUrl('/login'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -191,7 +185,7 @@ export default function PatrimonyPage() {
         role: registerData.role
       };
 
-      const response = await fetch('http://localhost:8080/api/register', {
+      const response = await fetch(apiUrl('/register'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -269,14 +263,11 @@ export default function PatrimonyPage() {
 
   const handleRefresh = () => setRefreshList(prev => prev + 1);
 
-  // ✅ Handler para PDF assinado
   const handlePdfSigned = (file: File) => {
     console.log('📄 PDF assinado:', file.name);
     alert(`✅ PDF "${file.name}" assinado com sucesso!`);
-    // Aqui você pode fazer upload para o servidor se necessário
   };
 
-  // ✅ Funções para paginação
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -517,7 +508,6 @@ export default function PatrimonyPage() {
           </div>
 
           <div className={styles.actionMenu}>
-            {/* ✅ BOTÃO PARA ASSINAR PDF */}
             <button 
               className={`${styles.btn} ${styles.btnPrimary}`}
               onClick={() => setShowPdfSigner(true)}
@@ -544,6 +534,18 @@ export default function PatrimonyPage() {
               >
                 <span className={styles.btnIcon}>🚛</span>
                 Frota
+              </span>
+            </Link>
+
+            {/* ✅ BOTÃO PARA LEILÕES - ADICIONADO */}
+            <Link href="/leiloes">
+              <span 
+                className={`${styles.btn} ${styles.btnSecondary}`} 
+                title="Ir para o módulo de Leilões"
+                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}
+              >
+                <span className={styles.btnIcon}>🏷️</span>
+                Leilões
               </span>
             </Link>
 
@@ -761,7 +763,6 @@ export default function PatrimonyPage() {
           departments={departments}
           sectors={sectors}
           onClose={() => setShowFleetPrintModal(false)}
-         
         />
       )}
 
@@ -791,7 +792,6 @@ export default function PatrimonyPage() {
         <BackupModal onClose={() => setShowBackupModal(false)} />
       )}
 
-      {/* ✅ PDF SIGNER MODAL */}
       {showPdfSigner && (
         <PdfSigner
           onClose={() => setShowPdfSigner(false)}

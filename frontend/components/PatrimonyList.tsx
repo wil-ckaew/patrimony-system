@@ -5,6 +5,7 @@ import { PatrimonyItem } from '../types/Patrimony';
 import styles from './PatrimonyList.module.css';
 import { getAuthHeaders, handleAuthError } from '../utils/auth';
 import { getDepartmentName } from '../utils/departments';
+import { apiUrl, BACKEND_BASE_URL } from '../lib/api';
 
 interface PatrimonyListProps {
   onEdit: (item: PatrimonyItem) => void;
@@ -80,7 +81,7 @@ export default function PatrimonyList({
         console.log('🔍 Buscando por:', searchQuery);
       }
 
-      const url = `http://localhost:8080/api/patrimony${params.toString() ? `?${params.toString()}` : ''}`;
+      const url = apiUrl(`/patrimony${params.toString() ? `?${params.toString()}` : ''}`);
       
       console.log('🔍 URL completa:', url);
       
@@ -148,7 +149,7 @@ export default function PatrimonyList({
     if (!confirm('Tem certeza que deseja excluir este bem?')) return;
   
     try {
-      const deleteResponse = await fetch(`http://localhost:8080/api/patrimony/${id}`, {
+      const deleteResponse = await fetch(apiUrl(`/patrimony/${id}`), {
         method: 'DELETE',
         headers: getAuthHeaders()
       });
@@ -175,7 +176,7 @@ export default function PatrimonyList({
   const handleDocumentClick = (documentUrl: string | undefined, e: React.MouseEvent) => {
     e.stopPropagation();
     if (documentUrl) {
-      const baseUrl = 'http://localhost:8080';
+      const baseUrl = BACKEND_BASE_URL;
       const fullUrl = documentUrl.startsWith('/') ? `${baseUrl}${documentUrl}` : `${baseUrl}/${documentUrl}`;
       window.open(fullUrl, '_blank');
     }
@@ -238,7 +239,7 @@ export default function PatrimonyList({
               patrimonies.map((item, index) => {
                 const isExpanded = expandedItems.has(item.id);
                 const imageFullUrl = item.imageUrl 
-                  ? (item.imageUrl.startsWith('http') ? item.imageUrl : `http://localhost:8080${item.imageUrl.startsWith('/') ? '' : '/'}${item.imageUrl}`)
+                  ? (item.imageUrl.startsWith('http') ? item.imageUrl : `${BACKEND_BASE_URL}${item.imageUrl.startsWith('/') ? '' : '/'}${item.imageUrl}`)
                   : null;
                 const rowClass = index % 2 === 0 ? styles.evenRow : styles.oddRow;
 

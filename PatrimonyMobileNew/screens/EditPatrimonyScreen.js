@@ -19,6 +19,44 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuth } from '../contexts/AuthContext';
 import { API_BASE_URL } from '../config';
 
+console.log('[Edit] 📄 ARQUIVO EditPatrimonyScreen.js CARREGADO');
+
+// ============================================================
+// HELPERS DE COMPATIBILIDADE WEB/MOBILE
+// ============================================================
+
+// Alerta compatível com web e mobile
+const showAlert = (title, message, onOk) => {
+  if (Platform.OS === 'web') {
+    try {
+      window.alert(`${title}\n\n${message}`);
+    } catch (e) {
+      console.log('[Edit] window.alert falhou:', e);
+    }
+    if (onOk) onOk();
+  } else {
+    Alert.alert(title, message, [{ text: 'OK', onPress: onOk }], { cancelable: false });
+  }
+};
+
+// Alerta com confirmação (cancelar/confirmar)
+const showConfirm = (title, message, onConfirm, onCancel) => {
+  if (Platform.OS === 'web') {
+    const confirmed = window.confirm(`${title}\n\n${message}`);
+    if (confirmed && onConfirm) onConfirm();
+    else if (!confirmed && onCancel) onCancel();
+  } else {
+    Alert.alert(
+      title,
+      message,
+      [
+        { text: 'Cancelar', style: 'cancel', onPress: onCancel },
+        { text: 'OK', style: 'destructive', onPress: onConfirm }
+      ]
+    );
+  }
+};
+
 export default function EditPatrimonyScreen({ route, navigation }) {
   const { patrimony } = route.params;
   const [loading, setLoading] = useState(false);
@@ -45,37 +83,58 @@ export default function EditPatrimonyScreen({ route, navigation }) {
 
   const { token } = useAuth();
 
-  const verifyPermissions = async () => {
+  console.log('[Edit] 🎬 Tela renderizada — patrimony.id:', patrimony?.id, '| token:', token ? 'OK' : 'AUSENTE');
+
+  // ============================================================
+  // NAVEGAÇÃO DE VOLTA (compatível com web e mobile)
+  // ============================================================
+  const goBackToList = () => {
+    console.log('[Edit] 🔙 Tentando voltar para a lista...');
     try {
-      // Câmera
+      if (navigation.canGoBack && navigation.canGoBack()) {
+        console.log('[Edit] 🔙 goBack()');
+        navigation.goBack();
+      } else {
+        console.log('[Edit] 🔙 não pode goBack, tentando navigate("Patrimonies")');
+        navigation.navigate('Patrimonies');
+      }
+    } catch (e) {
+      console.log('[Edit] ❌ erro na navegação:', e);
+      try {
+        navigation.navigate('Patrimonies');
+      } catch (e2) {
+        console.log('[Edit] ❌ navigate também falhou:', e2);
+      }
+    }
+  };
+
+  // ============================================================
+  // PERMISSÕES
+  // ============================================================
+  const verifyPermissions = async () => {
+    // No web, não precisa de permissão
+    if (Platform.OS === 'web') return true;
+
+    try {
       const cameraPermission = await ImagePicker.getCameraPermissionsAsync();
       if (cameraPermission.status !== 'granted') {
         const newCameraPermission = await ImagePicker.requestCameraPermissionsAsync();
         if (newCameraPermission.status !== 'granted') {
-          Alert.alert(
+          showAlert(
             'Permissão necessária',
-            'Você precisa conceder permissão para usar a câmera.',
-            [
-              { text: 'Cancelar', style: 'cancel' },
-              { text: 'Abrir Configurações', onPress: () => Linking.openSettings() }
-            ]
+            'Você precisa conceder permissão para usar a câmera.'
           );
           return false;
         }
       }
 
-      // Galeria
       const galleryPermission = await ImagePicker.getMediaLibraryPermissionsAsync();
       if (galleryPermission.status !== 'granted') {
         const newGalleryPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (newGalleryPermission.status !== 'granted') {
-          Alert.alert(
+          showAlert(
             'Permissão necessária',
-            'Você precisa conceder permissão para acessar a galeria.',
-            [
-              { text: 'Cancelar', style: 'cancel' },
-              { text: 'Abrir Configurações', onPress: () => Linking.openSettings() }
-            ]
+            'Você precisa conceder permissão para acessar a galeria.'
           );
           return false;
         }
@@ -88,6 +147,9 @@ export default function EditPatrimonyScreen({ route, navigation }) {
     }
   };
 
+  // ============================================================
+  // IMAGEM
+  // ============================================================
   const extractUriFromResult = (result) => {
     if (result?.canceled === false && result?.assets && result.assets[0]?.uri) {
       return result.assets[0].uri;
@@ -113,7 +175,7 @@ export default function EditPatrimonyScreen({ route, navigation }) {
       const uri = extractUriFromResult(result);
       if (uri) setImage(uri);
     } catch (error) {
-      Alert.alert('Erro', 'Não foi possível abrir a câmera');
+      showAlert('Erro', 'Não foi possível abrir a câmera');
       console.error('takePicture error', error);
     }
   };
@@ -133,11 +195,16 @@ export default function EditPatrimonyScreen({ route, navigation }) {
       const uri = extractUriFromResult(result);
       if (uri) setImage(uri);
     } catch (error) {
-      Alert.alert('Erro', 'Não foi possível selecionar a imagem');
+      showAlert('Erro', 'Não foi possível selecionar a imagem');
       console.error('pickImage error', error);
     }
   };
 
+  const removeImage = () => setImage(null);
+
+  // ============================================================
+  // DATE PICKER
+  // ============================================================
   const showDatepicker = (field) => {
     Keyboard.dismiss();
     setCurrentDateField(field);
@@ -156,55 +223,135 @@ export default function EditPatrimonyScreen({ route, navigation }) {
     }
   };
 
+  // ============================================================
+  // UPLOAD DE IMAGEM — COMPATÍVEL COM WEB E MOBILE
+  // ============================================================
   const uploadImageToPatrimony = async (patrimonyId, imageUri) => {
+    console.log('[Edit] 🖼️ Iniciando upload. Platform:', Platform.OS);
+    console.log('[Edit] 🖼️ imageUri (primeiros 100 chars):', imageUri?.substring(0, 100));
+
     try {
       const formData = new FormData();
-      
-      // Adiciona timestamp ao nome do arquivo para evitar problemas de cache
-      const filename = imageUri.split('/').pop();
-      const uniqueFilename = `${Date.now()}_${filename}`;
-      
-      let type = 'image/jpeg';
-      if (filename.toLowerCase().endsWith('.png')) type = 'image/png';
-      if (filename.toLowerCase().endsWith('.gif')) type = 'image/gif';
 
-      formData.append('image', {
-        uri: imageUri,
-        name: uniqueFilename,
-        type,
-      });
+      if (Platform.OS === 'web') {
+        // ============ WEB ============
+        console.log('[Edit] 🌐 Modo WEB — convertendo para Blob');
 
-      console.log('Enviando imagem para:', `${API_BASE_URL}/api/patrimony/${patrimonyId}/image`);
+        let blob;
+        let filename = `image_${Date.now()}.jpg`;
+        let mimeType = 'image/jpeg';
 
-      const uploadResponse = await fetch(`${API_BASE_URL}/api/patrimony/${patrimonyId}/image`, {
+        if (imageUri.startsWith('blob:') || imageUri.startsWith('data:')) {
+          // blob: ou data: URL — buscar e converter para Blob
+          const blobResponse = await fetch(imageUri);
+          blob = await blobResponse.blob();
+
+          // Tentar extrair extensão do blob
+          if (blob.type) {
+            mimeType = blob.type;
+            const ext = mimeType.split('/')[1] || 'jpg';
+            filename = `image_${Date.now()}.${ext}`;
+          }
+        } else if (imageUri.startsWith('http')) {
+          // URL http — buscar e converter
+          const blobResponse = await fetch(imageUri);
+          blob = await blobResponse.blob();
+          if (blob.type) {
+            mimeType = blob.type;
+            const ext = mimeType.split('/')[1] || 'jpg';
+            filename = `image_${Date.now()}.${ext}`;
+          }
+        } else {
+          showAlert('Erro', 'Formato de imagem não suportado no navegador.');
+          return false;
+        }
+
+        console.log('[Edit] 🌐 Blob criado:', blob.size, 'bytes, tipo:', mimeType);
+        formData.append('image', blob, filename);
+      } else {
+        // ============ MOBILE ============
+        console.log('[Edit] 📱 Modo MOBILE');
+
+        const rawFilename = imageUri.split('/').pop();
+        const uniqueFilename = `${Date.now()}_${rawFilename}`;
+
+        let type = 'image/jpeg';
+        const lower = rawFilename.toLowerCase();
+        if (lower.endsWith('.png')) type = 'image/png';
+        if (lower.endsWith('.gif')) type = 'image/gif';
+
+        formData.append('image', {
+          uri: imageUri,
+          name: uniqueFilename,
+          type,
+        });
+      }
+
+      const uploadUrl = `${API_BASE_URL}/api/patrimony/${patrimonyId}/image`;
+      console.log('[Edit] 🌐 POST', uploadUrl);
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+      const uploadResponse = await fetch(uploadUrl, {
         method: 'POST',
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
+          // NÃO definir Content-Type — o fetch define automaticamente com boundary
         },
         body: formData,
+        signal: controller.signal,
       });
 
+      clearTimeout(timeoutId);
+
+      console.log('[Edit] 📡 Upload status:', uploadResponse.status);
+
       if (uploadResponse.ok) {
-        console.log('✅ Imagem enviada com sucesso');
+        console.log('[Edit] ✅ Imagem enviada com sucesso');
         return true;
       } else {
         const errorText = await uploadResponse.text();
-        console.log('❌ Falha no upload:', uploadResponse.status, errorText);
+        console.log('[Edit] ❌ Falha no upload:', uploadResponse.status, errorText);
+        showAlert('Erro no upload', `HTTP ${uploadResponse.status}\n${errorText}`);
         return false;
       }
     } catch (error) {
-      console.log('❌ Erro ao enviar imagem:', error);
+      console.log('[Edit] ❌ Erro ao enviar imagem:', error);
+      if (error.name === 'AbortError') {
+        showAlert('Timeout', 'O upload da imagem demorou mais de 30s.');
+      } else {
+        showAlert('Erro no upload', `Erro: ${error.message}`);
+      }
       return false;
     }
   };
 
+  // ============================================================
+  // SUBMIT — ATUALIZAR BEM
+  // ============================================================
   const handleSubmit = async () => {
+    console.log('[Edit] 🔵 handleSubmit chamado');
+    console.log('[Edit] 📦 formData:', formData);
+    console.log('[Edit] 🔑 token:', token ? `${token.substring(0, 20)}...` : 'AUSENTE');
+    console.log('[Edit] 🆔 patrimony.id:', patrimony?.id);
+    console.log('[Edit] 🌐 API_BASE_URL:', API_BASE_URL);
+
     if (!formData.plate || !formData.name || !formData.department) {
-      Alert.alert('Erro', 'Preencha pelo menos placa, nome e departamento');
+      console.log('[Edit] ❌ Validação falhou');
+      showAlert('Erro', 'Preencha pelo menos placa, nome e departamento');
       return;
     }
 
+    if (!token) {
+      console.log('[Edit] ❌ Token ausente');
+      showAlert('Sessão expirada', 'Faça login novamente.');
+      return;
+    }
+
+    console.log('[Edit] ✅ Validação passou, iniciando requisição');
     setLoading(true);
+
     try {
       const payload = {
         plate: formData.plate.trim(),
@@ -222,79 +369,100 @@ export default function EditPatrimonyScreen({ route, navigation }) {
         nf_issue_date: formData.nf_issue_date || null,
       };
 
-      const response = await fetch(`${API_BASE_URL}/api/patrimony/${patrimony.id}`, {
+      const url = `${API_BASE_URL}/api/patrimony/${patrimony.id}`;
+      console.log('[Edit] 🌐 PUT', url);
+      console.log('[Edit] 📤 payload:', JSON.stringify(payload));
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+      const response = await fetch(url, {
         method: 'PUT',
         headers: {
-          'Authorization': token ? `Bearer ${token}` : '',
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),
+        signal: controller.signal,
       });
 
+      clearTimeout(timeoutId);
+
+      console.log('[Edit] 📡 Status HTTP:', response.status);
+
       if (response.ok) {
+        console.log('[Edit] ✅ PUT OK');
+
+        // Fazer upload da imagem se houver nova
         let imageSuccess = true;
-        
-        // Upload da imagem apenas se for uma nova imagem (não uma URL)
         if (image && image !== patrimony.imageUrl && !image.startsWith('http')) {
+          console.log('[Edit] 🖼️ Nova imagem detectada, fazendo upload');
           imageSuccess = await uploadImageToPatrimony(patrimony.id, image);
         }
 
         if (imageSuccess) {
-          Alert.alert('Sucesso', 'Bem atualizado com sucesso!');
-          navigation.goBack();
+          console.log('[Edit] ✅ Sucesso completo — voltando para lista');
+          showAlert(
+            'Sucesso',
+            'Bem atualizado com sucesso!',
+            () => {
+              console.log('[Edit] 🔙 Executando goBackToList');
+              goBackToList();
+            }
+          );
         } else {
-          Alert.alert(
-            'Atenção', 
-            'Bem atualizado, mas a imagem não foi enviada. Tente editar novamente.'
+          console.log('[Edit] ⚠️ Bem atualizado mas imagem falhou');
+          showAlert(
+            'Atenção',
+            'Bem atualizado, mas a imagem não foi enviada. Tente editar novamente.',
+            () => goBackToList()
           );
         }
       } else {
         const errorText = await response.text();
-        Alert.alert('Erro', errorText || 'Erro ao atualizar bem');
+        console.log('[Edit] ❌ Erro do servidor:', errorText);
+        showAlert('Erro', errorText || `Erro ao atualizar bem (HTTP ${response.status})`);
       }
     } catch (error) {
-      console.error('Error:', error);
-      Alert.alert('Erro', 'Erro de conexão. Verifique se o servidor está rodando.');
+      console.error('[Edit] ❌ Exception:', error);
+      if (error.name === 'AbortError') {
+        showAlert('Timeout', 'O servidor não respondeu em 15 segundos.');
+      } else {
+        showAlert('Erro', `Erro de conexão: ${error.message}`);
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const removeImage = () => setImage(null);
-
-  const handleDelete = async () => {
-    Alert.alert(
+  // ============================================================
+  // DELETE
+  // ============================================================
+  const handleDelete = () => {
+    showConfirm(
       'Confirmar Exclusão',
       'Tem certeza que deseja excluir este bem? Esta ação não pode ser desfeita.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Excluir',
-          style: 'destructive',
-          onPress: async () => {
-            setLoading(true);
-            try {
-              const response = await fetch(`${API_BASE_URL}/api/patrimony/${patrimony.id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': token ? `Bearer ${token}` : '' },
-              });
+      async () => {
+        setLoading(true);
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/patrimony/${patrimony.id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': token ? `Bearer ${token}` : '' },
+          });
 
-              if (response.ok) {
-                Alert.alert('Sucesso', 'Bem excluído com sucesso!');
-                navigation.goBack();
-              } else {
-                const errorText = await response.text();
-                Alert.alert('Erro', errorText || 'Erro ao excluir bem');
-              }
-            } catch (error) {
-              console.error('Error:', error);
-              Alert.alert('Erro', 'Erro de conexão');
-            } finally {
-              setLoading(false);
-            }
+          if (response.ok) {
+            showAlert('Sucesso', 'Bem excluído com sucesso!', () => goBackToList());
+          } else {
+            const errorText = await response.text();
+            showAlert('Erro', errorText || 'Erro ao excluir bem');
           }
+        } catch (error) {
+          console.error('Error:', error);
+          showAlert('Erro', 'Erro de conexão');
+        } finally {
+          setLoading(false);
         }
-      ]
+      }
     );
   };
 
@@ -333,7 +501,11 @@ export default function EditPatrimonyScreen({ route, navigation }) {
   };
 
   return (
-    <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
+    <ScrollView
+      style={styles.container}
+      keyboardShouldPersistTaps="always"
+      keyboardDismissMode="on-drag"
+    >
       <View style={styles.header}>
         <Text style={styles.title}>Editar Bem Patrimonial</Text>
         <Text style={styles.subtitle}>Placa: {patrimony.plate}</Text>
@@ -502,11 +674,31 @@ export default function EditPatrimonyScreen({ route, navigation }) {
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={[styles.button, loading && styles.buttonDisabled]} onPress={handleSubmit} disabled={loading}>
+        <TouchableOpacity
+          style={[styles.button, loading && styles.buttonDisabled]}
+          onPress={() => {
+            console.log('🔥 BOTAO CLICADO');
+            if (Platform.OS === 'web') {
+              if (window.confirm('Confirmar atualização do bem?')) {
+                handleSubmit();
+              }
+            } else {
+              alert('BOTAO CLICADO - handleSubmit vai rodar');
+              handleSubmit();
+            }
+          }}
+          disabled={loading}
+          activeOpacity={0.7}
+        >
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Atualizar Bem</Text>}
         </TouchableOpacity>
 
-        <TouchableOpacity style={[styles.deleteButton, loading && styles.buttonDisabled]} onPress={handleDelete} disabled={loading}>
+        <TouchableOpacity
+          style={[styles.deleteButton, loading && styles.buttonDisabled]}
+          onPress={handleDelete}
+          disabled={loading}
+          activeOpacity={0.7}
+        >
           <Text style={styles.deleteButtonText}>Excluir Bem</Text>
         </TouchableOpacity>
       </View>

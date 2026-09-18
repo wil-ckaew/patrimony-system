@@ -1,25 +1,25 @@
-version: "3.8"
-
 services:
   db:
     image: postgres:13
     container_name: patrimony-db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: patrimony
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "5433:5432"
+      - "${DB_PORT:-5434}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/migrations:/docker-entrypoint-initdb.d
       - ./backups:/backups
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
       interval: 30s
       timeout: 10s
       retries: 5
+    networks:
+      - patrimony-network
 
   backend:
     build: ./backend
@@ -29,29 +29,38 @@ services:
       db:
         condition: service_healthy
     ports:
-      - "8080:8080"
+      - "${BACKEND_PORT:-8090}:8080"
     environment:
-      DATABASE_URL: "postgres://postgres:password@db:5432/patrimony"
+      DATABASE_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}"
       RUST_LOG: debug
-      JWT_SECRET: seu_jwt_secret_super_seguro_aqui
+      JWT_SECRET: ${JWT_SECRET}
+      ALLOWED_ORIGINS: "http://localhost:${FRONTEND_PORT},http://${TAILSCALE_IP}:${FRONTEND_PORT},http://${TAILSCALE_IP}:${BACKEND_PORT},http://192.168.100.105:${FRONTEND_PORT},http://192.168.100.105:${BACKEND_PORT}"
     volumes:
       - ./uploads:/app/uploads
       - ./documents:/app/documents
       - ./backups:/app/backups
       - ./restore-backup.sh:/app/restore-backup.sh
       - ./backup.sh:/app/backup.sh
+    networks:
+      - patrimony-network
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: "http://192.168.100.105:8090"
+        NEXT_PUBLIC_BACKEND_URL: "http://192.168.100.105:8090"
     container_name: patrimony-frontend
     restart: unless-stopped
     depends_on:
       - backend
     ports:
-      - "3000:3000"
+      - "${FRONTEND_PORT:-3005}:3000"
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8080/api
-      NEXT_PUBLIC_BACKEND_URL: http://localhost:8080
+      NEXT_PUBLIC_API_URL: "http://192.168.100.105:8090"
+      NEXT_PUBLIC_BACKEND_URL: "http://192.168.100.105:8090"
+    networks:
+      - patrimony-network
 
   ai-service:
     build: ./ai-service
@@ -60,9 +69,11 @@ services:
     depends_on:
       - backend
     ports:
-      - "5000:5000"
+      - "${AI_PORT:-5001}:5000"
     volumes:
       - ./ai-service/models:/app/models
+    networks:
+      - patrimony-network
 
   backup:
     image: postgres:13
@@ -73,17 +84,25 @@ services:
     volumes:
       - ./backups:/backups
     environment:
-      POSTGRES_PASSWORD: password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     entrypoint: >
       bash -c "
       apt-get update &&
       apt-get install -y cron &&
-      echo '0 2 * * * pg_dump -h db -U postgres patrimony > /backups/backup-$$(date +\%Y-\%m-\%d_\%H-\%M-\%S).sql' > /etc/cron.d/db-backup &&
+      echo '0 2 * * * pg_dump -h db -U ${POSTGRES_USER} ${POSTGRES_DB} > /backups/backup-$$(date +\%Y-\%m-\%d_\%H-\%M-\%S).sql' > /etc/cron.d/db-backup &&
       echo '0 3 * * * find /backups -name \"*.sql\" -mtime +7 -delete' >> /etc/cron.d/db-backup &&
       chmod 0644 /etc/cron.d/db-backup &&
       crontab /etc/cron.d/db-backup &&
       cron -f
       "
+    networks:
+      - patrimony-network
 
 volumes:
   postgres_data:
+    name: patrimony-postgres-data
+
+networks:
+  patrimony-network:
+    name: patrimony-network
+    driver: bridge

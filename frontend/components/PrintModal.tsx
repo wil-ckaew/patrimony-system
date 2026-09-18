@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { PatrimonyItem } from '../types/Patrimony';
 import { getAuthHeaders } from '../utils/auth';
 import styles from './PatrimonyPage.module.css';
+import { apiUrl, BACKEND_BASE_URL } from '../lib/api';
 
 type PatrimonyItemWithType = PatrimonyItem & {
   type?: string;
@@ -71,7 +72,7 @@ const PrintModal: React.FC<PrintModalProps> = ({ filters, onClose }) => {
 
   const fetchSectorsAndOthers = async () => {
     try {
-      const response = await fetch('http://localhost:8080/api/patrimony', {
+      const response = await fetch(apiUrl('/patrimony'), {
         headers: getAuthHeaders()
       });
 
@@ -108,7 +109,7 @@ const PrintModal: React.FC<PrintModalProps> = ({ filters, onClose }) => {
     setError(null);
 
     try {
-      const response = await fetch('http://localhost:8080/api/patrimony', {
+      const response = await fetch(apiUrl('/patrimony'), {
         headers: getAuthHeaders()
       });
 

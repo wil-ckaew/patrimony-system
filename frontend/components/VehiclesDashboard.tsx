@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { getAuthHeaders, handleAuthError } from '../utils/auth';
 import { getDepartmentName, getDepartmentColor } from '../utils/departments';
 import styles from './Dashboard.module.css';
+import { apiUrl, BACKEND_BASE_URL } from '../lib/api';
 
 interface VehicleStats {
   total: number;
@@ -21,7 +22,7 @@ export default function VehiclesDashboard({ department }: { department: string }
     try {
       setLoading(true);
       // use the generic stats endpoint with a flag
-      const base = 'http://localhost:8080/api/stats?vehicles=true';
+      const base = apiUrl('/stats?vehicles=true');
       const url =
         department === 'all'
           ? base

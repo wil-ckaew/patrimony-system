@@ -15,6 +15,7 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log('[Auth] 🚀 AuthProvider montou — restaurando sessão');
     checkExistingAuth();
   }, []);
 
@@ -24,20 +25,27 @@ export function AuthProvider({ children }) {
         AsyncStorage.getItem('@auth_token'),
         AsyncStorage.getItem('@auth_user')
       ]);
-      
+
       if (storedToken && storedUser) {
-        // Verificar se o token ainda é válido
-        const isValid = await validateToken(storedToken);
-        if (isValid) {
-          setToken(storedToken);
-          setUser(JSON.parse(storedUser));
-        } else {
-          await logout();
-        }
+        console.log('[Auth] ✅ Sessão encontrada no storage');
+        // Restaura direto, sem validar (evita 401 em rede instável)
+        setToken(storedToken);
+        setUser(JSON.parse(storedUser));
+
+        // Valida em background (não bloqueia)
+        validateToken(storedToken).then(isValid => {
+          if (!isValid) {
+            console.log('[Auth] ⚠️ Token inválido — fazendo logout');
+            logout();
+          } else {
+            console.log('[Auth] ✅ Token válido');
+          }
+        });
+      } else {
+        console.log('[Auth] ❌ Nenhuma sessão salva');
       }
     } catch (error) {
-      console.error('Error loading auth data:', error);
-      await logout();
+      console.error('[Auth] Erro ao carregar dados:', error);
     } finally {
       setLoading(false);
     }
@@ -45,14 +53,18 @@ export function AuthProvider({ children }) {
 
   const validateToken = async (tokenToValidate) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/validate-token`, {
+      const response = await fetch(`${API_BASE_URL}/api/patrimony`, {
+        method: 'GET',
         headers: {
           'Authorization': `Bearer ${tokenToValidate}`,
+          'Content-Type': 'application/json',
         },
       });
-      return response.ok;
+      if (response.status === 401) return false;
+      return true;
     } catch (error) {
-      return false;
+      console.log('[Auth] Erro ao validar token (mantendo sessão):', error.message);
+      return true; // mantém sessão em caso de erro de rede
     }
   };
 
@@ -60,39 +72,40 @@ export function AuthProvider({ children }) {
     try {
       const response = await fetch(`${API_BASE_URL}/api/login`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       });
-      
       if (response.ok) {
         const data = await response.json();
-        
         await Promise.all([
           AsyncStorage.setItem('@auth_token', data.token),
           AsyncStorage.setItem('@auth_user', JSON.stringify(data.user))
         ]);
-        
         setToken(data.token);
         setUser(data.user);
-        
+        console.log('[Auth] ✅ Login OK:', data.user.username);
         return { success: true };
       } else {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({}));
         return { success: false, error: errorData.message || 'Login failed' };
       }
     } catch (error) {
-      console.error('Erro no login:', error);
+      console.error('[Auth] Erro no login:', error);
       return { success: false, error: 'Network error' };
     }
   };
 
-  // Adicionar função para obter headers autenticados
+  // ✅ IMPORTANTE: prioriza o token do state, mas recorre ao storage
   const getAuthHeaders = async () => {
-    const currentToken = token || await AsyncStorage.getItem('@auth_token');
+    let currentToken = token;
+    if (!currentToken) {
+      currentToken = await AsyncStorage.getItem('@auth_token');
+      console.log('[Auth] 🔑 token do storage (state vazio):', currentToken ? 'OK' : 'AUSENTE');
+    } else {
+      console.log('[Auth] 🔑 token do state:', 'OK');
+    }
     return {
-      'Authorization': `Bearer ${currentToken}`,
+      'Authorization': `Bearer ${currentToken || ''}`,
       'Content-Type': 'application/json',
     };
   };
@@ -101,24 +114,19 @@ export function AuthProvider({ children }) {
     try {
       const response = await fetch(`${API_BASE_URL}/api/register`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(userData),
       });
-
-      if (response.ok) {
-        return { success: true };
-      } else {
-        const errorData = await response.json();
-        return { success: false, error: errorData.message || 'Registration failed' };
-      }
+      if (response.ok) return { success: true };
+      const errorData = await response.json().catch(() => ({}));
+      return { success: false, error: errorData.message || 'Registration failed' };
     } catch (error) {
       return { success: false, error: 'Network error' };
     }
   };
 
   const logout = async () => {
+    console.log('[Auth] 🚪 Logout');
     await Promise.all([
       AsyncStorage.removeItem('@auth_token'),
       AsyncStorage.removeItem('@auth_user')
@@ -128,13 +136,7 @@ export function AuthProvider({ children }) {
   };
 
   const value = {
-    user,
-    token,
-    login,
-    register,
-    logout,
-    loading,
-    getAuthHeaders // Adicionar esta função ao contexto
+    user, token, login, register, logout, loading, getAuthHeaders
   };
 
   return (

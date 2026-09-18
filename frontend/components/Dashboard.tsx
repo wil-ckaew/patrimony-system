@@ -5,6 +5,7 @@ import styles from './Dashboard.module.css';
 import { getAuthHeaders, handleAuthError } from '../utils/auth';
 import { getDepartmentName, getDepartmentColor } from '../utils/departments';
 import VehiclesDashboard from './VehiclesDashboard';
+import { apiUrl, BACKEND_BASE_URL } from '../lib/api';
 
 export default function Dashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
@@ -21,8 +22,8 @@ export default function Dashboard() {
       setLoading(true);
       const url =
         selectedDepartment === 'all'
-          ? 'http://localhost:8080/api/stats'
-          : `http://localhost:8080/api/stats?department=${selectedDepartment}`;
+          ? apiUrl('/stats')
+          : apiUrl(`/stats?department=${selectedDepartment}`);
 
       const response = await fetch(url, { headers: getAuthHeaders() });
       if (handleAuthError(response)) return;
@@ -78,6 +79,8 @@ export default function Dashboard() {
           <option value="transportation">Transporte</option>
           <option value="finance">Finanças</option>
           <option value="assistenci">Assistencia Comunitaria</option>
+          <option value="profissoes">Instituo de Profissões</option>
+          <option value="desenvolve">Desenvolvimento</option>
           <option value="tourism">Turismo</option>
           <option value="environment">Meio Ambiente</option>
           <option value="government">Governo</option>

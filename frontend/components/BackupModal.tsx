@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import styles from './BackupModal.module.css';
 import { getAuthHeaders } from '../utils/auth';
+import { apiUrl, BACKEND_BASE_URL } from '../lib/api';
 
 interface BackupFile {
   name: string;
@@ -26,7 +27,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ onClose }) => {
     setLoading(true);
     setError('');
     try {
-      const response = await fetch('http://localhost:8080/api/backups', {
+      const response = await fetch(apiUrl('/backups'), {
         headers: getAuthHeaders()
       });
       if (!response.ok) throw new Error('Erro ao listar backups');
@@ -107,7 +108,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ onClose }) => {
     setError('');
     setSuccess('');
     try {
-      const response = await fetch('http://localhost:8080/api/backup', {
+      const response = await fetch(apiUrl('/backup'), {
         method: 'POST',
         headers: getAuthHeaders()
       });
@@ -133,7 +134,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ onClose }) => {
     setError('');
     setSuccess('');
     try {
-      const response = await fetch('http://localhost:8080/api/restore', {
+      const response = await fetch(apiUrl('/restore'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

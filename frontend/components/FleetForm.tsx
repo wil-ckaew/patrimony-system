@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { FleetItem, FleetFormData, PatrimonyItem } from '../types/Patrimony';
 import styles from './FleetForm.module.css';
 import { getAuthHeaders, handleAuthError } from '../utils/auth';
+import { apiUrl, BACKEND_BASE_URL } from '../lib/api';
 
 interface FleetFormProps {
   item: FleetItem | null;
@@ -199,7 +200,7 @@ export default function FleetForm({ item, onClose, onRefresh }: FleetFormProps) 
   // ✅ MODIFIQUE ESTA FUNÇÃO PARA TRADUZIR OS DEPARTAMENTOS
   const fetchDepartments = async () => {
     try {
-      const response = await fetch('http://localhost:8080/api/departments', {
+      const response = await fetch(apiUrl('/departments'), {
         headers: getAuthHeaders(),
       });
       if (handleAuthError(response)) return;
@@ -231,7 +232,7 @@ export default function FleetForm({ item, onClose, onRefresh }: FleetFormProps) 
 
   const fetchVehicles = async () => {
     try {
-      const response = await fetch('http://localhost:8080/api/patrimony?is_vehicle=true', {
+      const response = await fetch(apiUrl('/patrimony?is_vehicle=true'), {
         headers: getAuthHeaders(),
       });
       if (handleAuthError(response)) return;
@@ -258,7 +259,7 @@ export default function FleetForm({ item, onClose, onRefresh }: FleetFormProps) 
     setError('');
 
     try {
-      const endpoint = item ? `http://localhost:8080/api/fleet/${item.id}` : 'http://localhost:8080/api/fleet';
+      const endpoint = item ? apiUrl(`/fleet/${item.id}`) : apiUrl('/fleet');
       const method = item ? 'PUT' : 'POST';
 
       const response = await fetch(endpoint, {

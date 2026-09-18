@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { FleetItem } from '../types/Patrimony';
 import styles from './FleetList.module.css';
 import { getAuthHeaders, handleAuthError } from '../utils/auth';
+import { apiUrl, BACKEND_BASE_URL } from '../lib/api';
 
 interface FleetListProps {
   onEdit: (item: FleetItem) => void;
@@ -39,7 +40,7 @@ export default function FleetList({
       setError('');
 
       const response = await fetch(
-        'http://localhost:8080/api/fleet',
+        apiUrl('/fleet'),
         {
           headers: getAuthHeaders(),
         }
@@ -66,7 +67,7 @@ export default function FleetList({
 
           try {
             const vehicleResponse = await fetch(
-              `http://localhost:8080/api/patrimony/${item.patrimony_id}`,
+              apiUrl(`/patrimony/${item.patrimony_id}`),
               {
                 headers: getAuthHeaders(),
               }
@@ -106,7 +107,7 @@ export default function FleetList({
 
     try {
       const response = await fetch(
-        `http://localhost:8080/api/patrimony/${patrimonyId}`,
+        apiUrl(`/patrimony/${patrimonyId}`),
         {
           headers: getAuthHeaders(),
         }
@@ -191,7 +192,7 @@ export default function FleetList({
     }
 
     try {
-      const response = await fetch(`http://localhost:8080/api/fleet/${id}`, {
+      const response = await fetch(apiUrl(`/fleet/${id}`), {
         method: 'DELETE',
         headers: getAuthHeaders(),
       });
@@ -335,7 +336,7 @@ export default function FleetList({
                   const imageFullUrl = vehicleDetail?.image_url
                     ? (vehicleDetail.image_url.startsWith('http')
                       ? vehicleDetail.image_url
-                      : `http://localhost:8080${vehicleDetail.image_url.startsWith('/') ? '' : '/'}${vehicleDetail.image_url}`)
+                      : `${BACKEND_BASE_URL}${vehicleDetail.image_url.startsWith('/') ? '' : '/'}${vehicleDetail.image_url}`)
                     : null;
 
                   return (

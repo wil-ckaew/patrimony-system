@@ -5,7 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator } from 'react-native';
 
-// Import das telas
+// Telas
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
 import DashboardScreen from './screens/DashboardScreen';
@@ -14,9 +14,11 @@ import PatrimonyDetailScreen from './screens/PatrimonyDetailScreen';
 import TransferScreen from './screens/TransferScreen';
 import NewPatrimonyScreen from './screens/NewPatrimonyScreen';
 import EditPatrimonyScreen from './screens/EditPatrimonyScreen';
-import BulkPatrimonyScreen from './screens/BulkPatrimonyScreen'; // ✅ NOVA TELA
+import BulkPatrimonyScreen from './screens/BulkPatrimonyScreen';
+import FleetScreen from './screens/FleetScreen';
+import LeiloesScreen from './screens/LeiloesScreen';
+import LeilaoDetailScreen from './screens/LeilaoDetailScreen';
 
-// Contexto de autenticação
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 const Stack = createNativeStackNavigator();
@@ -24,7 +26,6 @@ const Stack = createNativeStackNavigator();
 function AppContent() {
   const { user, loading } = useAuth();
 
-  // Enquanto carrega o estado de autenticação
   if (loading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -38,54 +39,21 @@ function AppContent() {
       <Stack.Navigator initialRouteName={user ? 'Dashboard' : 'Login'}>
         {!user ? (
           <>
-            <Stack.Screen 
-              name="Login" 
-              component={LoginScreen} 
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen 
-              name="Register" 
-              component={RegisterScreen} 
-              options={{ headerShown: false }}
-            />
+            <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="Register" component={RegisterScreen} options={{ headerShown: false }} />
           </>
         ) : (
           <>
-            <Stack.Screen 
-              name="Dashboard" 
-              component={DashboardScreen} 
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen 
-              name="PatrimonyList" 
-              component={PatrimonyListScreen}
-              options={{ title: 'Lista de Bens' }}
-            />
-            <Stack.Screen 
-              name="PatrimonyDetail" 
-              component={PatrimonyDetailScreen}
-              options={{ title: 'Detalhes do Bem' }}
-            />
-            <Stack.Screen 
-              name="Transfer" 
-              component={TransferScreen}
-              options={{ title: 'Transferir Bem' }}
-            />
-            <Stack.Screen 
-              name="NewPatrimony" 
-              component={NewPatrimonyScreen}
-              options={{ title: 'Novo Bem Patrimonial' }}
-            />
-            <Stack.Screen 
-              name="EditPatrimony" 
-              component={EditPatrimonyScreen}
-              options={{ title: 'Editar Bem Patrimonial' }}
-            />
-            <Stack.Screen 
-              name="BulkPatrimony" 
-              component={BulkPatrimonyScreen}
-              options={{ title: '📦 Cadastro em Massa' }}
-            />
+            <Stack.Screen name="Dashboard" component={DashboardScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="PatrimonyList" component={PatrimonyListScreen} options={{ title: 'Lista de Bens' }} />
+            <Stack.Screen name="PatrimonyDetail" component={PatrimonyDetailScreen} options={{ title: 'Detalhes do Bem' }} />
+            <Stack.Screen name="Transfer" component={TransferScreen} options={{ title: 'Transferir Bem' }} />
+            <Stack.Screen name="NewPatrimony" component={NewPatrimonyScreen} options={{ title: 'Novo Bem Patrimonial' }} />
+            <Stack.Screen name="EditPatrimony" component={EditPatrimonyScreen} options={{ title: 'Editar Bem Patrimonial' }} />
+            <Stack.Screen name="BulkPatrimony" component={BulkPatrimonyScreen} options={{ title: '📦 Cadastro em Massa' }} />
+            <Stack.Screen name="Fleet" component={FleetScreen} options={{ title: 'Gestão de Frota' }} />
+            <Stack.Screen name="Leiloes" component={LeiloesScreen} options={{ title: 'Leilões' }} />
+            <Stack.Screen name="LeilaoDetail" component={LeilaoDetailScreen} options={{ title: 'Detalhes do Leilão' }} />
           </>
         )}
       </Stack.Navigator>

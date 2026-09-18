@@ -4,6 +4,7 @@ import { PatrimonyItem, TransferRequest } from '../types/Patrimony';
 import styles from './TransferModal.module.css';
 import { getAuthHeaders, handleAuthError } from '../utils/auth';
 import { getDepartmentName } from '../utils/departments';
+import { apiUrl, BACKEND_BASE_URL } from '../lib/api';
 
 interface TransferModalProps {
   item: PatrimonyItem;
@@ -52,7 +53,7 @@ export default function TransferModal({ item, onClose, onTransferSuccess }: Tran
       };
 
       // ✅ CORREÇÃO: Usar getAuthHeaders() em vez de headers manuais
-      const response = await fetch('http://localhost:8080/api/transfer', {
+      const response = await fetch(apiUrl('/transfer'), {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(transferRequest),

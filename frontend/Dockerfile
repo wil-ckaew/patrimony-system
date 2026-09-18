@@ -1,19 +1,37 @@
-FROM node:18-bullseye
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copiar dependências
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_BACKEND_URL
+
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_BACKEND_URL=$NEXT_PUBLIC_BACKEND_URL
+
+RUN echo "========================================" && \
+    echo "🔧 Building with:" && \
+    echo "   NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL" && \
+    echo "   NEXT_PUBLIC_BACKEND_URL=$NEXT_PUBLIC_BACKEND_URL" && \
+    echo "========================================"
+
 COPY package*.json ./
-RUN npm install --legacy-peer-deps
+RUN npm ci || npm install
 
-# Copiar todo o código
 COPY . .
-
-# Criar pasta public se não existir
-RUN mkdir -p public
-
-# Build
 RUN npm run build
+
+FROM node:20-alpine AS runner
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/next.config.js ./next.config.js
 
 EXPOSE 3000
 

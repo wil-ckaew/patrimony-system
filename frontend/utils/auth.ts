@@ -1,3 +1,4 @@
+import { apiUrl, BACKEND_BASE_URL } from '../lib/api';
 // utils/auth.ts
 
 export const getAuthHeaders = (): HeadersInit => {
@@ -39,7 +40,7 @@ export const checkTokenValidity = async (): Promise<boolean> => {
     const token = localStorage.getItem('token');
     if (!token) return false;
 
-    const response = await fetch('http://localhost:8080/api/health', {
+    const response = await fetch(apiUrl('/health'), {
       headers: getAuthHeaders(),
     });
 
@@ -56,7 +57,7 @@ export const checkPlateExists = async (plate: string): Promise<boolean> => {
     if (!token) return false;
 
     // ✅ USANDO O NOVO ENDPOINT COM BUSCA EXATA
-    const response = await fetch(`http://localhost:8080/api/patrimony/check-plate?plate=${encodeURIComponent(plate)}`, {
+    const response = await fetch(apiUrl(`/patrimony/check-plate?plate=${encodeURIComponent(plate)}`), {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -92,7 +93,7 @@ export const checkPlateExistsFallback = async (plate: string): Promise<boolean> 
     if (!token) return false;
 
     // Buscar todos os patrimônios
-    const response = await fetch('http://localhost:8080/api/patrimony', {
+    const response = await fetch(apiUrl('/patrimony'), {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -117,7 +118,7 @@ export const checkPlateExistsPartial = async (plate: string): Promise<boolean> =
     const token = localStorage.getItem('token');
     if (!token) return false;
 
-    const response = await fetch(`http://localhost:8080/api/patrimony?plate=${encodeURIComponent(plate)}`, {
+    const response = await fetch(apiUrl(`/patrimony?plate=${encodeURIComponent(plate)}`), {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -142,7 +143,7 @@ export const getAllPatrimonies = async (): Promise<any[]> => {
     const token = localStorage.getItem('token');
     if (!token) return [];
 
-    const response = await fetch('http://localhost:8080/api/patrimony', {
+    const response = await fetch(apiUrl('/patrimony'), {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',

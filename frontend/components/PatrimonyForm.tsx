@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { PatrimonyItem, FiscalDocument } from '../types/Patrimony';
 import { getAuthHeaders, checkTokenValidity } from '../utils/auth';
 import OCRScanner from './OCRScanner';
+import { apiUrl, BACKEND_BASE_URL } from '../lib/api';
 
 interface PatrimonyFormProps {
   item?: PatrimonyItem | null;
@@ -55,7 +56,7 @@ export default function PatrimonyForm({ item, onClose, onRefresh }: PatrimonyFor
       const token = localStorage.getItem('token');
       if (!token) return false;
 
-      const response = await fetch(`http://localhost:8080/api/patrimony/check-plate?plate=${encodeURIComponent(plate)}`, {
+      const response = await fetch(apiUrl(`/patrimony/check-plate?plate=${encodeURIComponent(plate)}`), {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -113,7 +114,7 @@ export default function PatrimonyForm({ item, onClose, onRefresh }: PatrimonyFor
       try {
         console.log('📋 Carregando patrimônio para edição:', item.id);
         
-        const response = await fetch(`http://localhost:8080/api/patrimony/${item.id}`, {
+        const response = await fetch(apiUrl(`/patrimony/${item.id}`), {
           headers: getAuthHeaders(),
         });
         
@@ -324,7 +325,7 @@ export default function PatrimonyForm({ item, onClose, onRefresh }: PatrimonyFor
       const headers = getAuthHeaders();
       delete headers['Content-Type'];
       
-      const response = await fetch(`http://localhost:8080/api/patrimony/${patrimonyId}/image`, {
+      const response = await fetch(apiUrl(`/patrimony/${patrimonyId}/image`), {
         method: 'POST',
         headers,
         body: formData,
@@ -352,7 +353,7 @@ export default function PatrimonyForm({ item, onClose, onRefresh }: PatrimonyFor
       const query = new URLSearchParams();
       if (doc.invoiceNumber) query.append('invoice_number', doc.invoiceNumber);
       if (doc.commitmentNumber) query.append('commitment_number', doc.commitmentNumber);
-      const response = await fetch(`http://localhost:8080/api/patrimony/${patrimonyId}/document/${docType}?${query.toString()}`, {
+      const response = await fetch(apiUrl(`/patrimony/${patrimonyId}/document/${docType}?${query.toString()}`), {
         method: 'POST',
         headers,
         body: formData,
@@ -454,7 +455,7 @@ export default function PatrimonyForm({ item, onClose, onRefresh }: PatrimonyFor
       if (!patrimonyData.name) { alert('Nome obrigatório'); return; }
       if (!patrimonyData.department) { alert('Departamento obrigatório'); return; }
 
-      const url = item ? `http://localhost:8080/api/patrimony/${item.id}` : 'http://localhost:8080/api/patrimony';
+      const url = item ? apiUrl(`/patrimony/${item.id}`) : apiUrl('/patrimony');
       const method = item ? 'PUT' : 'POST';
 
       console.log('📤 Enviando dados:', method, url, patrimonyData);
@@ -773,7 +774,7 @@ export default function PatrimonyForm({ item, onClose, onRefresh }: PatrimonyFor
   const departments = [
     'Educação', 'Saúde', 'Administração', 'Urbanismo', 
     'Cultura', 'Esportes', 'Transporte', 'Finanças',
-    'Assistência Comunitária', 'Turismo', 'Meio Ambiente', 'Governo'
+    'Assistência Comunitária', 'Instituto de Profissões', 'Desenvolvimento', 'Turismo', 'Meio Ambiente', 'Governo'
   ];
 
   return (
@@ -1119,7 +1120,7 @@ export default function PatrimonyForm({ item, onClose, onRefresh }: PatrimonyFor
                           style={styles.formInput}
                         />
                         {doc.invoiceFile && !doc._invoiceFile && (
-                          <a href={`http://localhost:8080${doc.invoiceFile}`} target="_blank" rel="noopener noreferrer" style={styles.fileLink}>
+                          <a href={`${BACKEND_BASE_URL}${doc.invoiceFile}`} target="_blank" rel="noopener noreferrer" style={styles.fileLink}>
                             📎 Ver NF atual
                           </a>
                         )}
@@ -1136,7 +1137,7 @@ export default function PatrimonyForm({ item, onClose, onRefresh }: PatrimonyFor
                           style={styles.formInput}
                         />
                         {doc.commitmentFile && !doc._commitmentFile && (
-                          <a href={`http://localhost:8080${doc.commitmentFile}`} target="_blank" rel="noopener noreferrer" style={styles.fileLink}>
+                          <a href={`${BACKEND_BASE_URL}${doc.commitmentFile}`} target="_blank" rel="noopener noreferrer" style={styles.fileLink}>
                             📎 Ver Empenho atual
                           </a>
                         )}

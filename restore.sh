@@ -9,12 +9,12 @@ if [ -z "$BACKUP_FILE" ]; then
 fi
 
 echo "🛠 Restaurando backup do banco patrimony ..."
-docker exec -i db psql -U postgres -d patrimony < "$BACKUP_FILE"
+docker exec -i patrimony-db psql -U postgres -d patrimony < "$BACKUP_FILE"
 
 echo "📂 Aplicando migrations ..."
 for file in ./backend/migrations/*.sql; do
   echo "➡️ Rodando $file ..."
-  docker exec -i db psql -U postgres -d patrimony < "$file"
+  docker exec -i patrimony-db psql -U postgres -d patrimony < "$file"
 done
 
 echo "✅ Restore e migrations concluídos com sucesso!"

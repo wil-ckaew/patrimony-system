@@ -1,0 +1,11 @@
+.
+├── 0001_initial_setup.sql
+├── 0002_permissions.sql
+├── 0003_seed_data.sql
+├── 0004_add_new_fields_to_patrimonies.sql
+├── 0005_add_vehicle_flag.sql
+├── 0006_create_fiscal_documents.sql
+├── 0007_create_fleet_table.sql
+└── estrutura.txt
+
+1 directory, 8 files

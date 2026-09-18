@@ -113,3 +113,97 @@ coverage/
 *.zip
 *.rar
 *.7z
+
+# ============================================================
+# DOCUMENTOS SENSÍVEIS (não versionar)
+# ============================================================
+documents/
+uploads/
+*.pdf
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.webp
+
+# ============================================================
+# BACKUPS
+# ============================================================
+backups/
+*.sql
+*.sql.gz
+*.dump
+*.tar.gz
+backup-*.sql
+
+# ============================================================
+# PASTAS ANTIGAS / BACKUP
+# ============================================================
+*.old/
+*.old.bkp-*/
+*.bkp-*/
+*.bak/
+*.backup/
+backend.old/
+frontend.old/
+PatrimonyMobileNew.old/
+PatrimonyMobileNew.bkp-*/
+PatrimonyMobileNew.old.bkp-*/
+
+# ============================================================
+# CÓPIAS E ARQUIVOS TEMPORÁRIOS
+# ============================================================
+* copy*.tsx
+* copy*.rs
+* copy*.js
+*_copy*.rs
+*_copy*.tsx
+*_copy*.js
+*_errado*.rs
+*_errado*.tsx
+* (Cópia)*.rs
+*Cópia*
+*.bak
+*.bak-*
+*.new
+*.old
+*.orig
+*.tmp
+*.temp
+
+# ============================================================
+# MOBILE
+# ============================================================
+PatrimonyMobileNew/node_modules/
+PatrimonyMobileNew/.expo/
+PatrimonyMobileNew/dist/
+PatrimonyMobileNew/web-build/
+
+# ============================================================
+# FRONTEND
+# ============================================================
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# ============================================================
+# BACKEND
+# ============================================================
+backend/target/
+backend/.env
+backend/.env.*
+
+# ============================================================
+# AMBIENTE
+# ============================================================
+.env
+.env.local
+.env.*.local
+*.env.backup
+
+# ============================================================
+# SCRIPTS DE MANUTENÇÃO (opcional)
+# ============================================================
+corrigir_porta.sh
+restore_completo.sh
+verificar-seguranca.sh
