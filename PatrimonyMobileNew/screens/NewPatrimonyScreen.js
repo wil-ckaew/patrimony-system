@@ -32,6 +32,17 @@ const showAlert = (title, message, onOk) => {
   }
 };
 
+const showConfirm = (title, message, onConfirm) => {
+  if (Platform.OS === 'web') {
+    if (window.confirm(`${title}\n\n${message}`) && onConfirm) onConfirm();
+  } else {
+    Alert.alert(title, message, [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Confirmar', style: 'destructive', onPress: onConfirm }
+    ]);
+  }
+};
+
 // ============================================================
 // INPUT DE DATA — WEB usa <input type="date">, MOBILE usa TouchableOpacity
 // ============================================================
@@ -90,6 +101,9 @@ const DateInput = ({ label, value, onChange, disabled, placeholder }) => {
 export default function NewPatrimonyScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [image, setImage] = useState(null);
+  const [invoiceFile, setInvoiceFile] = useState(null);
+  const [commitmentFile, setCommitmentFile] = useState(null);
+  const [denfFile, setDenfFile] = useState(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showNfDatePicker, setShowNfDatePicker] = useState(false);
   const [currentDateField, setCurrentDateField] = useState('');
@@ -145,6 +159,9 @@ export default function NewPatrimonyScreen({ navigation }) {
     }
   };
 
+  // ============================================================
+  // SELEÇÃO DE IMAGEM (FOTO DO BEM)
+  // ============================================================
   const takePicture = async () => {
     const hasPermission = await verifyPermissions();
     if (!hasPermission) return;
@@ -182,6 +199,27 @@ export default function NewPatrimonyScreen({ navigation }) {
   };
 
   // ============================================================
+  // SELEÇÃO DE DOCUMENTOS (NF, EMPENHO, DENF)
+  // ============================================================
+  const pickDocument = async (setter, label) => {
+    const hasPermission = await verifyPermissions();
+    if (!hasPermission) return;
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 0.9,
+      });
+      if (!result.canceled && result.assets && result.assets[0]) {
+        setter(result.assets[0].uri);
+        console.log(`[New] 📎 ${label} selecionado:`, result.assets[0].uri);
+      }
+    } catch (error) {
+      showAlert('Erro', `Não foi possível selecionar ${label}`);
+    }
+  };
+
+  // ============================================================
   // DATA
   // ============================================================
   const handleDateChange = (field, newValue) => {
@@ -206,75 +244,79 @@ export default function NewPatrimonyScreen({ navigation }) {
   };
 
   // ============================================================
-  // VALOR — aceita vírgula e ponto, formata para o backend
+  // VALOR
   // ============================================================
   const handleValueChange = (text) => {
-    // Permite apenas números, vírgula e ponto
     let cleaned = text.replace(/[^0-9.,]/g, '');
-
-    // Se tiver mais de uma vírgula/ponto, mantém só o primeiro
     const firstComma = cleaned.indexOf(',');
     const firstDot = cleaned.indexOf('.');
-
     if (firstComma !== -1 && firstDot !== -1) {
-      // Se ambos existem, remove o que vier depois do primeiro
       const first = Math.min(
         firstComma === -1 ? Infinity : firstComma,
         firstDot === -1 ? Infinity : firstDot
       );
       cleaned = cleaned.substring(0, first + 1) + cleaned.substring(first + 1).replace(/[.,]/g, '');
     }
-
     setFormData({ ...formData, value: cleaned });
   };
 
   const parseValueToNumber = (valueStr) => {
     if (!valueStr) return 0;
-    // Troca vírgula por ponto e converte
     const normalized = valueStr.replace(',', '.');
     const parsed = parseFloat(normalized);
     return isNaN(parsed) ? 0 : parsed;
   };
 
   // ============================================================
-  // UPLOAD DE IMAGEM — web/mobile
+  // UPLOAD DE ARQUIVO (web/mobile)
   // ============================================================
-  const uploadImageToPatrimony = async (patrimonyId, imageUri) => {
+  const uploadFile = async (patrimonyId, fileUri, endpointType) => {
     try {
-      const formData = new FormData();
+      const fd = new FormData();
 
       if (Platform.OS === 'web') {
-        console.log('[New] 🌐 Upload web — convertendo para Blob');
-        const blobResponse = await fetch(imageUri);
+        console.log(`[New] 🌐 Upload web ${endpointType} — convertendo para Blob`);
+        const blobResponse = await fetch(fileUri);
         const blob = await blobResponse.blob();
         const mimeType = blob.type || 'image/jpeg';
         const ext = mimeType.split('/')[1] || 'jpg';
-        formData.append('image', blob, `image_${Date.now()}.${ext}`);
+        fd.append('file', blob, `${endpointType}_${Date.now()}.${ext}`);
       } else {
-        const filename = imageUri.split('/').pop();
+        const filename = fileUri.split('/').pop();
         let type = 'image/jpeg';
-        if (filename.endsWith('.png')) type = 'image/png';
-        if (filename.endsWith('.gif')) type = 'image/gif';
-        formData.append('image', { uri: imageUri, name: filename, type });
+        const lower = filename.toLowerCase();
+        if (lower.endsWith('.png')) type = 'image/png';
+        if (lower.endsWith('.pdf')) type = 'application/pdf';
+        if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) type = 'image/jpeg';
+        fd.append('file', { uri: fileUri, name: filename, type });
       }
 
-      console.log('[New] POST imagem para:', `${API_BASE_URL}/api/patrimony/${patrimonyId}/image`);
+      const url = `${API_BASE_URL}/api/patrimony/fiscal-document/${patrimonyId}/${endpointType}`;
+      console.log(`[New] POST ${endpointType} para:`, url);
 
-      const uploadResponse = await fetch(`${API_BASE_URL}/api/patrimony/${patrimonyId}/image`, {
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
-        body: formData,
+        body: fd,
       });
 
-      if (uploadResponse.ok) {
-        console.log('[New] ✅ Imagem enviada');
+      if (response.ok) {
+        console.log(`[New] ✅ ${endpointType} enviado`);
+        return true;
       } else {
-        const errorText = await uploadResponse.text();
-        console.log('[New] ❌ Falha upload:', uploadResponse.status, errorText);
+        const errorText = await response.text();
+        console.log(`[New] ❌ Falha ${endpointType}:`, response.status, errorText);
+        return false;
       }
     } catch (error) {
-      console.log('[New] ❌ Erro upload:', error);
+      console.log(`[New] ❌ Erro ${endpointType}:`, error);
+      return false;
     }
+  };
+
+  const uploadImageToPatrimony = (patrimonyId, imageUri) => {
+    // Reusa a mesma função para imagem do bem
+    return uploadFile(patrimonyId, imageUri, 'image');
   };
 
   // ============================================================
@@ -283,7 +325,6 @@ export default function NewPatrimonyScreen({ navigation }) {
   const handleSubmit = async () => {
     console.log('[New] 🔵 handleSubmit chamado');
     console.log('[New] 📦 formData:', formData);
-    console.log('[New] 💰 valor parseado:', parseValueToNumber(formData.value));
 
     if (!formData.plate || !formData.name || !formData.department) {
       showAlert('Erro', 'Preencha pelo menos placa, nome e departamento');
@@ -327,14 +368,22 @@ export default function NewPatrimonyScreen({ navigation }) {
         const responseData = await response.json();
         console.log('[New] ✅ Bem criado:', responseData);
 
-        if (image) {
-          try {
-            const patrimonyId = responseData.id;
-            if (patrimonyId) {
-              await uploadImageToPatrimony(patrimonyId, image);
+        const patrimonyId = responseData.id;
+
+        if (patrimonyId) {
+          // Upload de todos os arquivos
+          const uploads = [];
+          if (image) uploads.push(uploadFile(patrimonyId, image, 'image'));
+          if (invoiceFile) uploads.push(uploadFile(patrimonyId, invoiceFile, 'invoice'));
+          if (commitmentFile) uploads.push(uploadFile(patrimonyId, commitmentFile, 'commitment'));
+          if (denfFile) uploads.push(uploadFile(patrimonyId, denfFile, 'denf'));
+
+          if (uploads.length > 0) {
+            const results = await Promise.all(uploads);
+            const falhas = results.filter(r => r === false).length;
+            if (falhas > 0) {
+              console.log(`[New] ⚠️ ${falhas} arquivo(s) falharam`);
             }
-          } catch (imageError) {
-            console.log('[New] Imagem não pôde ser enviada:', imageError);
           }
         }
 
@@ -359,6 +408,9 @@ export default function NewPatrimonyScreen({ navigation }) {
   };
 
   const removeImage = () => setImage(null);
+  const removeInvoice = () => setInvoiceFile(null);
+  const removeCommitment = () => setCommitmentFile(null);
+  const removeDenf = () => setDenfFile(null);
 
   const departments = [
     'education', 'health', 'administration', 'urbanism',
@@ -397,9 +449,14 @@ export default function NewPatrimonyScreen({ navigation }) {
       </View>
 
       <View style={styles.form}>
-        {/* FOTO */}
-        <Text style={styles.label}>Foto do Bem (Opcional)</Text>
-        <View style={styles.imageSection}>
+        {/* ============================================ */}
+        {/* SEÇÃO DE ANEXOS */}
+        {/* ============================================ */}
+        <View style={styles.attachmentSection}>
+          <Text style={styles.attachmentTitle}>📎 Anexos (Opcional)</Text>
+
+          {/* FOTO DO BEM */}
+          <Text style={styles.fileLabel}>🖼️ Foto do Bem</Text>
           {image ? (
             <View style={styles.imagePreviewContainer}>
               <Image source={{ uri: image }} style={styles.imagePreview} />
@@ -421,8 +478,65 @@ export default function NewPatrimonyScreen({ navigation }) {
               </TouchableOpacity>
             </View>
           )}
+
+          {/* NOTA FISCAL */}
+          <Text style={styles.fileLabel}>📄 Nota Fiscal</Text>
+          <TouchableOpacity
+            style={styles.fileButton}
+            onPress={() => pickDocument(setInvoiceFile, 'Nota Fiscal')}
+            disabled={loading}
+          >
+            <Text style={styles.fileButtonText}>📎 Selecionar Arquivo</Text>
+          </TouchableOpacity>
+          {invoiceFile && (
+            <View style={styles.filePreview}>
+              <Text style={styles.fileName}>📄 NF selecionada</Text>
+              <TouchableOpacity onPress={removeInvoice} style={styles.removeFile}>
+                <Text style={styles.removeFileText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* EMPENHO */}
+          <Text style={styles.fileLabel}>📑 Empenho</Text>
+          <TouchableOpacity
+            style={styles.fileButton}
+            onPress={() => pickDocument(setCommitmentFile, 'Empenho')}
+            disabled={loading}
+          >
+            <Text style={styles.fileButtonText}>📎 Selecionar Arquivo</Text>
+          </TouchableOpacity>
+          {commitmentFile && (
+            <View style={styles.filePreview}>
+              <Text style={styles.fileName}>📑 Empenho selecionado</Text>
+              <TouchableOpacity onPress={removeCommitment} style={styles.removeFile}>
+                <Text style={styles.removeFileText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* DENF/SE */}
+          <Text style={styles.fileLabel}>📋 DENF/SE</Text>
+          <TouchableOpacity
+            style={styles.fileButton}
+            onPress={() => pickDocument(setDenfFile, 'DENF/SE')}
+            disabled={loading}
+          >
+            <Text style={styles.fileButtonText}>📎 Selecionar Arquivo</Text>
+          </TouchableOpacity>
+          {denfFile && (
+            <View style={styles.filePreview}>
+              <Text style={styles.fileName}>📋 DENF/SE selecionado</Text>
+              <TouchableOpacity onPress={removeDenf} style={styles.removeFile}>
+                <Text style={styles.removeFileText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
+        {/* ============================================ */}
+        {/* FORMULÁRIO */}
+        {/* ============================================ */}
         <Text style={styles.label}>Placa *</Text>
         <TextInput
           style={styles.input}
@@ -452,7 +566,6 @@ export default function NewPatrimonyScreen({ navigation }) {
           editable={!loading}
         />
 
-        {/* DATA AQUISIÇÃO */}
         <DateInput
           label="Data de Aquisição *"
           value={formData.acquisition_date}
@@ -461,7 +574,6 @@ export default function NewPatrimonyScreen({ navigation }) {
           placeholder="Selecionar data"
         />
 
-        {/* DATA NF */}
         <DateInput
           label="Data emissão NF (Opcional)"
           value={formData.nf_issue_date}
@@ -470,7 +582,6 @@ export default function NewPatrimonyScreen({ navigation }) {
           placeholder="Selecionar data"
         />
 
-        {/* VALOR — agora com decimal-pad + aceita vírgula */}
         <Text style={styles.label}>Valor (R$)</Text>
         <TextInput
           style={styles.input}
@@ -565,14 +676,11 @@ export default function NewPatrimonyScreen({ navigation }) {
           style={[styles.submitButton, loading && styles.buttonDisabled]}
           onPress={() => {
             console.log('🔥 BOTAO CADASTRAR CLICADO');
-            if (Platform.OS === 'web') {
-              if (window.confirm('Confirmar cadastro do bem?')) {
-                handleSubmit();
-              }
-            } else {
-              alert('Cadastrando bem...');
-              handleSubmit();
-            }
+            showConfirm(
+              'Confirmar Cadastro',
+              'Deseja cadastrar este bem?',
+              handleSubmit
+            );
           }}
           disabled={loading}
         >
@@ -621,36 +729,56 @@ const styles = StyleSheet.create({
   label: { fontSize: 16, fontWeight: '600', color: '#374151', marginBottom: 8, marginTop: 16 },
   hint: { fontSize: 12, color: '#9ca3af', marginTop: -12, marginBottom: 16, fontStyle: 'italic' },
   input: {
-    backgroundColor: 'white',
-    borderWidth: 2,
-    borderColor: '#e5e7eb',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    marginBottom: 16,
+    backgroundColor: 'white', borderWidth: 2, borderColor: '#e5e7eb',
+    borderRadius: 8, padding: 12, fontSize: 16, marginBottom: 16,
   },
   dateInput: {
-    backgroundColor: 'white',
-    borderWidth: 2,
-    borderColor: '#e5e7eb',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    marginBottom: 16,
-    justifyContent: 'center',
-    height: 48,
+    backgroundColor: 'white', borderWidth: 2, borderColor: '#e5e7eb',
+    borderRadius: 8, padding: 12, fontSize: 16, marginBottom: 16,
+    justifyContent: 'center', height: 48,
   },
   dateText: { fontSize: 16, color: '#374151' },
   placeholderText: { fontSize: 16, color: '#9ca3af' },
   textArea: { minHeight: 80, textAlignVertical: 'top' },
-  imageSection: { marginBottom: 20 },
-  imageButtons: { flexDirection: 'row', gap: 12 },
+
+  // Seção de anexos
+  attachmentSection: {
+    backgroundColor: '#fef3c7', borderRadius: 12, padding: 16,
+    marginBottom: 20, borderWidth: 1, borderColor: '#f59e0b',
+  },
+  attachmentTitle: {
+    fontSize: 16, fontWeight: 'bold', color: '#92400e', marginBottom: 12,
+  },
+  fileLabel: {
+    fontSize: 14, fontWeight: '600', color: '#92400e',
+    marginTop: 12, marginBottom: 6,
+  },
+  fileButton: {
+    backgroundColor: '#f59e0b', padding: 10, borderRadius: 8,
+    alignItems: 'center', marginBottom: 8,
+  },
+  fileButtonText: { color: 'white', fontSize: 13, fontWeight: '600' },
+  filePreview: {
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#fff7ed', padding: 8,
+    borderRadius: 8, marginTop: 4,
+  },
+  fileName: { fontSize: 12, color: '#92400e', flex: 1 },
+  removeFile: {
+    backgroundColor: '#ef4444', width: 24, height: 24,
+    borderRadius: 12, alignItems: 'center', justifyContent: 'center',
+  },
+  removeFileText: { color: 'white', fontSize: 12, fontWeight: 'bold' },
+
+  // Foto do bem
+  imageButtons: { flexDirection: 'row', gap: 12, marginBottom: 8 },
   imageButton: {
     flex: 1, backgroundColor: '#2563eb', padding: 12,
     borderRadius: 8, alignItems: 'center',
   },
   imageButtonText: { color: 'white', fontSize: 14, fontWeight: '600' },
-  imagePreviewContainer: { position: 'relative', alignItems: 'center' },
+  imagePreviewContainer: { position: 'relative', alignItems: 'center', marginBottom: 8 },
   imagePreview: {
     width: 200, height: 200, borderRadius: 8,
     borderWidth: 2, borderColor: '#e5e7eb',
@@ -661,6 +789,7 @@ const styles = StyleSheet.create({
     borderRadius: 15, justifyContent: 'center', alignItems: 'center',
   },
   removeImageText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
+
   departmentScroll: { marginVertical: 8, marginBottom: 16 },
   departmentButton: {
     backgroundColor: '#f1f5f9', padding: 12, borderRadius: 8,

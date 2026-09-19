@@ -17,17 +17,86 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuth } from '../contexts/AuthContext';
 import { API_BASE_URL } from '../config';
 
+console.log('[Bulk] 📄 BulkPatrimonyScreen.js CARREGADO');
+
+// ============================================================
+// HELPERS WEB/MOBILE
+// ============================================================
+const showAlert = (title, message, onOk) => {
+  if (Platform.OS === 'web') {
+    try { window.alert(`${title}\n\n${message}`); } catch (e) {}
+    if (onOk) onOk();
+  } else {
+    Alert.alert(title, message, [{ text: 'OK', onPress: onOk }], { cancelable: false });
+  }
+};
+
+// ============================================================
+// INPUT DE DATA — igual ao NewPatrimonyScreen
+// ============================================================
+const DateInput = ({ label, value, onChange, disabled, placeholder }) => {
+  if (Platform.OS === 'web') {
+    return (
+      <View>
+        <Text style={styles.label}>{label}</Text>
+        <input
+          type="date"
+          value={value || ''}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={disabled}
+          style={{
+            backgroundColor: 'white',
+            borderWidth: '2px',
+            borderStyle: 'solid',
+            borderColor: '#e5e7eb',
+            borderRadius: '8px',
+            padding: '10px 12px',
+            fontSize: '16px',
+            marginBottom: '16px',
+            width: '100%',
+            maxWidth: '100%',
+            height: '44px',
+            boxSizing: 'border-box',
+            fontFamily: 'inherit',
+            color: '#374151',
+            appearance: 'none',
+            WebkitAppearance: 'none',
+            MozAppearance: 'none',
+            display: 'block',
+            lineHeight: 'normal',
+          }}
+        />
+      </View>
+    );
+  }
+
+  return (
+    <View>
+      <Text style={styles.label}>{label}</Text>
+      <TouchableOpacity
+        style={styles.dateInput}
+        onPress={() => onChange('__OPEN_PICKER__')}
+        disabled={disabled}
+      >
+        <Text style={value ? styles.dateText : styles.placeholderText}>
+          {value || placeholder || 'Selecionar data'}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
+
 export default function BulkPatrimonyScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showNfDatePicker, setShowNfDatePicker] = useState(false);
   const [currentDateField, setCurrentDateField] = useState('');
-  
-  // Estados para arquivos
+
   const [image, setImage] = useState(null);
   const [invoiceFile, setInvoiceFile] = useState(null);
   const [commitmentFile, setCommitmentFile] = useState(null);
-  
+  const [denfFile, setDenfFile] = useState(null);
+
   const [formData, setFormData] = useState({
     start_plate: '',
     end_plate: '',
@@ -48,7 +117,9 @@ export default function BulkPatrimonyScreen({ navigation }) {
 
   const { token } = useAuth();
 
-  // Funções para selecionar arquivos
+  // ============================================================
+  // SELEÇÃO DE IMAGEM
+  // ============================================================
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
@@ -56,190 +127,181 @@ export default function BulkPatrimonyScreen({ navigation }) {
       aspect: [4, 3],
       quality: 0.8,
     });
-
     if (!result.canceled && result.assets && result.assets[0]) {
       setImage(result.assets[0].uri);
-    }
-  };
-
-  const pickInvoiceFile = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: false,
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets && result.assets[0]) {
-      setInvoiceFile(result.assets[0].uri);
-    }
-  };
-
-  const pickCommitmentFile = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: false,
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets && result.assets[0]) {
-      setCommitmentFile(result.assets[0].uri);
     }
   };
 
   const takePicture = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Erro', 'Precisamos de permissão para usar a câmera');
+      showAlert('Erro', 'Precisamos de permissão para usar a câmera');
       return;
     }
-
     const result = await ImagePicker.launchCameraAsync({
       allowsEditing: true,
       aspect: [4, 3],
       quality: 0.8,
     });
-
     if (!result.canceled && result.assets && result.assets[0]) {
       setImage(result.assets[0].uri);
     }
   };
 
-  // Função para fazer upload de um arquivo para um patrimônio específico
-  const uploadFileToPatrimony = async (patrimonyId, fileUri, type) => {
+  // ============================================================
+  // SELEÇÃO DE DOCUMENTO (NF, EMPENHO, DENF)
+  // ============================================================
+  const pickDocument = async (setter, label) => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: false,
+      quality: 0.9,
+    });
+    if (!result.canceled && result.assets && result.assets[0]) {
+      setter(result.assets[0].uri);
+      console.log(`[Bulk] 📎 ${label} selecionado`);
+    }
+  };
+
+  // ============================================================
+  // DATA
+  // ============================================================
+  const handleDateChange = (field, newValue) => {
+    if (newValue === '__OPEN_PICKER__') {
+      setCurrentDateField(field);
+      if (field === 'acquisition_date') setShowDatePicker(true);
+      if (field === 'nf_issue_date') setShowNfDatePicker(true);
+      return;
+    }
+    setFormData(prev => ({ ...prev, [field]: newValue }));
+  };
+
+  const onDateChangeMobile = (event, selectedDate) => {
+    const currentField = currentDateField;
+    if (currentField === 'acquisition_date') setShowDatePicker(Platform.OS === 'ios');
+    if (currentField === 'nf_issue_date') setShowNfDatePicker(Platform.OS === 'ios');
+    if (selectedDate) {
+      const formattedDate = selectedDate.toISOString().split('T')[0];
+      setFormData(prev => ({ ...prev, [currentField]: formattedDate }));
+    }
+  };
+
+  // ============================================================
+  // UPLOAD DE ARQUIVO
+  // ============================================================
+  const uploadFile = async (patrimonyId, fileUri, endpointType) => {
     try {
-      const formData = new FormData();
-      const filename = fileUri.split('/').pop();
-      let mimeType = 'image/jpeg';
-      if (filename.endsWith('.png')) mimeType = 'image/png';
-      if (filename.endsWith('.jpg')) mimeType = 'image/jpeg';
+      const fd = new FormData();
 
-      formData.append(type === 'image' ? 'image' : 'document', {
-        uri: fileUri,
-        name: filename,
-        type: mimeType,
-      });
-
-      let url;
-      if (type === 'image') {
-        url = `${API_BASE_URL}/api/patrimony/${patrimonyId}/image`;
+      if (Platform.OS === 'web') {
+        const blobResponse = await fetch(fileUri);
+        const blob = await blobResponse.blob();
+        const mimeType = blob.type || 'image/jpeg';
+        const ext = mimeType.split('/')[1] || 'jpg';
+        fd.append('file', blob, `${endpointType}_${Date.now()}.${ext}`);
       } else {
-        url = `${API_BASE_URL}/api/patrimony/${patrimonyId}/document/${type}`;
+        const filename = fileUri.split('/').pop();
+        let type = 'image/jpeg';
+        const lower = filename.toLowerCase();
+        if (lower.endsWith('.png')) type = 'image/png';
+        if (lower.endsWith('.pdf')) type = 'application/pdf';
+        fd.append('file', { uri: fileUri, name: filename, type });
       }
 
+      const url = `${API_BASE_URL}/api/patrimony/fiscal-document/${patrimonyId}/${endpointType}`;
       const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-        body: formData,
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: fd,
       });
 
       return response.ok;
     } catch (error) {
-      console.error(`Erro ao enviar ${type}:`, error);
+      console.error(`[Bulk] Erro upload ${endpointType}:`, error);
       return false;
     }
   };
 
-  // Função para fazer upload em paralelo para todos os patrimônios
   const uploadFilesToAllPatrimonies = async (patrimonyIds) => {
     const uploadPromises = [];
-    
     for (const patrimonyId of patrimonyIds) {
-      if (image) {
-        uploadPromises.push(uploadFileToPatrimony(patrimonyId, image, 'image'));
-      }
-      if (invoiceFile) {
-        uploadPromises.push(uploadFileToPatrimony(patrimonyId, invoiceFile, 'invoice'));
-      }
-      if (commitmentFile) {
-        uploadPromises.push(uploadFileToPatrimony(patrimonyId, commitmentFile, 'commitment'));
-      }
+      if (image) uploadPromises.push(uploadFile(patrimonyId, image, 'image'));
+      if (invoiceFile) uploadPromises.push(uploadFile(patrimonyId, invoiceFile, 'invoice'));
+      if (commitmentFile) uploadPromises.push(uploadFile(patrimonyId, commitmentFile, 'commitment'));
+      if (denfFile) uploadPromises.push(uploadFile(patrimonyId, denfFile, 'denf'));
     }
-    
-    // Executar todos os uploads em paralelo
     const results = await Promise.allSettled(uploadPromises);
-    
     const successCount = results.filter(r => r.status === 'fulfilled' && r.value === true).length;
     const failCount = results.filter(r => r.status === 'rejected' || r.value === false).length;
-    
     return { successCount, failCount, total: uploadPromises.length };
   };
 
-  const showDatepicker = (field) => {
-    setCurrentDateField(field);
-    if (field === 'acquisition_date') {
-      setShowDatePicker(true);
-    } else if (field === 'nf_issue_date') {
-      setShowNfDatePicker(true);
-    }
-  };
-
-  const onDateChange = (event, selectedDate) => {
-    const currentField = currentDateField;
-    
-    if (currentField === 'acquisition_date') {
-      setShowDatePicker(Platform.OS === 'ios');
-    } else if (currentField === 'nf_issue_date') {
-      setShowNfDatePicker(Platform.OS === 'ios');
-    }
-
-    if (selectedDate) {
-      const formattedDate = selectedDate.toISOString().split('T')[0];
-      setFormData(prev => ({
-        ...prev,
-        [currentField]: formattedDate
-      }));
-    }
-  };
-
+  // ============================================================
+  // SUBMIT
+  // ============================================================
   const handleSubmit = async () => {
     const start = parseInt(formData.start_plate);
     const end = parseInt(formData.end_plate);
-    
-    if (isNaN(start) || isNaN(end)) {
-      Alert.alert('Erro', 'Informe os números inicial e final');
-      return;
-    }
-    
-    if (start > end) {
-      Alert.alert('Erro', 'Número inicial deve ser menor que o final');
-      return;
-    }
-    
-    if (!formData.name.trim()) {
-      Alert.alert('Erro', 'Nome do bem é obrigatório');
-      return;
-    }
-    
-    if (!formData.value || parseFloat(formData.value) <= 0) {
-      Alert.alert('Erro', 'Valor deve ser maior que zero');
-      return;
-    }
 
+    if (isNaN(start) || isNaN(end)) {
+      showAlert('Erro', 'Informe os números inicial e final');
+      return;
+    }
+    if (start > end) {
+      showAlert('Erro', 'Número inicial deve ser menor que o final');
+      return;
+    }
+    if (!formData.name.trim()) {
+      showAlert('Erro', 'Nome do bem é obrigatório');
+      return;
+    }
+    if (!formData.value || parseFloat(formData.value.replace(',', '.')) <= 0) {
+      showAlert('Erro', 'Valor deve ser maior que zero');
+      return;
+    }
     if (!formData.department) {
-      Alert.alert('Erro', 'Departamento é obrigatório');
+      showAlert('Erro', 'Departamento é obrigatório');
       return;
     }
 
     const totalItems = end - start + 1;
-    Alert.alert(
-      'Confirmar Cadastro em Massa',
-      `📦 Você está prestes a cadastrar ${totalItems} patrimônios!\n\n🔢 Faixa: ${start} a ${end}\n📝 Nome: ${formData.name}\n💰 Valor: R$ ${parseFloat(formData.value).toFixed(2)}\n\n🖼️ ${image ? 'Com foto' : 'Sem foto'}\n📄 ${invoiceFile ? 'Com NF' : 'Sem NF'}\n📑 ${commitmentFile ? 'Com Empenho' : 'Sem Empenho'}\n\nOs arquivos serão anexados a TODOS os itens!\n\nDeseja continuar?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Confirmar', onPress: executeSubmit }
-      ]
-    );
+
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm(
+        `📦 Cadastro em Massa\n\n` +
+        `🔢 Faixa: ${start} a ${end}\n` +
+        `📊 Total: ${totalItems} patrimônios\n` +
+        `📝 Nome: ${formData.name}\n` +
+        `💰 Valor: R$ ${parseFloat(formData.value.replace(',', '.')).toFixed(2)}\n\n` +
+        `🖼️ ${image ? 'Com foto' : 'Sem foto'}\n` +
+        `📄 ${invoiceFile ? 'Com NF' : 'Sem NF'}\n` +
+        `📑 ${commitmentFile ? 'Com Empenho' : 'Sem Empenho'}\n` +
+        `📋 ${denfFile ? 'Com DENF/SE' : 'Sem DENF/SE'}\n\n` +
+        `Os arquivos serão anexados a TODOS os itens.\n\nDeseja continuar?`
+      );
+      if (confirmed) executeSubmit();
+    } else {
+      Alert.alert(
+        'Confirmar Cadastro em Massa',
+        `📦 Você está prestes a cadastrar ${totalItems} patrimônios!\n\n` +
+        `🔢 Faixa: ${start} a ${end}\n` +
+        `📝 Nome: ${formData.name}\n` +
+        `💰 Valor: R$ ${parseFloat(formData.value.replace(',', '.')).toFixed(2)}\n\n` +
+        `Deseja continuar?`,
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Confirmar', onPress: executeSubmit }
+        ]
+      );
+    }
   };
 
   const executeSubmit = async () => {
     setLoading(true);
-    
     try {
       const start = parseInt(formData.start_plate);
       const end = parseInt(formData.end_plate);
-      
+
       const payload = {
         start_plate: start,
         end_plate: end,
@@ -258,7 +320,7 @@ export default function BulkPatrimonyScreen({ navigation }) {
         is_vehicle: formData.is_vehicle
       };
 
-      console.log('📦 Enviando dados em massa:', payload);
+      console.log('[Bulk] 📦 Enviando:', payload);
 
       const response = await fetch(`${API_BASE_URL}/api/patrimony/bulk`, {
         method: 'POST',
@@ -270,53 +332,46 @@ export default function BulkPatrimonyScreen({ navigation }) {
       });
 
       const data = await response.json();
-      console.log('📦 Resposta do servidor:', data);
+      console.log('[Bulk] 📦 Resposta:', data);
 
       if (response.ok && data.inserted > 0 && data.inserted_ids && data.inserted_ids.length > 0) {
-        
-        // Se tem arquivos para upload, anexar a CADA patrimônio criado
-        if (image || invoiceFile || commitmentFile) {
-          console.log(`📤 Fazendo upload dos arquivos para ${data.inserted_ids.length} patrimônios...`);
-          
+        if (image || invoiceFile || commitmentFile || denfFile) {
           const { successCount, failCount, total } = await uploadFilesToAllPatrimonies(data.inserted_ids);
-          
-          console.log(`✅ Uploads concluídos: ${successCount} sucessos, ${failCount} falhas de ${total} total`);
-          
+          console.log(`[Bulk] ✅ Uploads: ${successCount}/${total}`);
           if (failCount > 0) {
-            Alert.alert('Aviso', `${successCount} uploads realizados com sucesso, ${failCount} falhas. Os patrimônios foram criados, mas alguns arquivos podem não ter sido anexados.`);
+            showAlert('Aviso', `${successCount} uploads OK, ${failCount} falharam.`);
           }
         }
-        
-        Alert.alert(
-          '✅ Sucesso!', 
-          `${data.inserted} patrimônios cadastrados com sucesso!\n\n📊 Total solicitado: ${data.total}\n${image || invoiceFile || commitmentFile ? `\n📎 Arquivos anexados a TODOS os ${data.inserted} itens!` : ''}`,
-          [{ text: 'OK', onPress: () => navigation.goBack() }]
+
+        showAlert(
+          'Sucesso!',
+          `${data.inserted} patrimônios cadastrados!\n\n📊 Total: ${data.total}`,
+          () => navigation.goBack()
         );
       } else if (response.ok && data.inserted > 0) {
-        // Caso não tenha inserted_ids (back-end antigo)
-        Alert.alert(
-          '✅ Sucesso!', 
-          `${data.inserted} patrimônios cadastrados com sucesso!\n\n⚠️ Não foi possível anexar os arquivos.`,
-          [{ text: 'OK', onPress: () => navigation.goBack() }]
+        showAlert(
+          'Sucesso!',
+          `${data.inserted} patrimônios cadastrados!`,
+          () => navigation.goBack()
         );
       } else {
-        Alert.alert('Erro', data.error || 'Erro ao cadastrar bens em massa');
+        showAlert('Erro', data.error || 'Erro ao cadastrar bens em massa');
       }
     } catch (error) {
-      console.error('Error:', error);
-      Alert.alert('Erro', `Erro ao cadastrar: ${error.message}`);
+      console.error('[Bulk] Error:', error);
+      showAlert('Erro', `Erro ao cadastrar: ${error.message}`);
     } finally {
       setLoading(false);
     }
   };
 
-  const totalItems = formData.start_plate && formData.end_plate 
+  const totalItems = formData.start_plate && formData.end_plate
     ? parseInt(formData.end_plate) - parseInt(formData.start_plate) + 1
     : 0;
 
   const departments = [
-    'Educação', 'Saúde', 'Administração', 'Urbanismo', 
-    'Cultura', 'Esportes', 'Transporte', 'Finanças', 
+    'Educação', 'Saúde', 'Administração', 'Urbanismo',
+    'Cultura', 'Esportes', 'Transporte', 'Finanças',
     'Assistência Comunitária', 'Turismo', 'Meio Ambiente'
   ];
 
@@ -328,14 +383,13 @@ export default function BulkPatrimonyScreen({ navigation }) {
   ];
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} keyboardShouldPersistTaps="always">
       <View style={styles.header}>
         <Text style={styles.title}>📦 Cadastro em Massa</Text>
         <Text style={styles.subtitle}>Cadastre vários bens de uma só vez</Text>
       </View>
 
       <View style={styles.form}>
-        {/* Faixa de Numeração */}
         <View style={styles.rangeCard}>
           <Text style={styles.rangeTitle}>🔢 Faixa de Numeração</Text>
           <View style={styles.rangeRow}>
@@ -371,14 +425,10 @@ export default function BulkPatrimonyScreen({ navigation }) {
           )}
         </View>
 
-        {/* Seção de Arquivos (opcional) */}
         <View style={styles.fileSection}>
           <Text style={styles.sectionTitle}>📎 Anexos (Opcional)</Text>
-          <Text style={styles.sectionSubtitle}>
-            Os arquivos serão anexados a TODOS os bens da faixa
-          </Text>
-          
-          {/* Foto do Bem */}
+          <Text style={styles.sectionSubtitle}>Os arquivos serão anexados a TODOS os bens</Text>
+
           <Text style={styles.fileLabel}>🖼️ Foto do Bem</Text>
           <View style={styles.fileButtons}>
             <TouchableOpacity style={styles.fileButton} onPress={takePicture}>
@@ -397,13 +447,10 @@ export default function BulkPatrimonyScreen({ navigation }) {
             </View>
           )}
 
-          {/* Nota Fiscal */}
           <Text style={styles.fileLabel}>📄 Nota Fiscal</Text>
-          <View style={styles.fileButtons}>
-            <TouchableOpacity style={styles.fileButton} onPress={pickInvoiceFile}>
-              <Text style={styles.fileButtonText}>📎 Selecionar Arquivo</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity style={styles.fileButton} onPress={() => pickDocument(setInvoiceFile, 'NF')}>
+            <Text style={styles.fileButtonText}>📎 Selecionar Arquivo</Text>
+          </TouchableOpacity>
           {invoiceFile && (
             <View style={styles.filePreview}>
               <Text style={styles.fileName}>📄 NF selecionada</Text>
@@ -413,17 +460,27 @@ export default function BulkPatrimonyScreen({ navigation }) {
             </View>
           )}
 
-          {/* Empenho */}
           <Text style={styles.fileLabel}>📑 Empenho</Text>
-          <View style={styles.fileButtons}>
-            <TouchableOpacity style={styles.fileButton} onPress={pickCommitmentFile}>
-              <Text style={styles.fileButtonText}>📎 Selecionar Arquivo</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity style={styles.fileButton} onPress={() => pickDocument(setCommitmentFile, 'Empenho')}>
+            <Text style={styles.fileButtonText}>📎 Selecionar Arquivo</Text>
+          </TouchableOpacity>
           {commitmentFile && (
             <View style={styles.filePreview}>
               <Text style={styles.fileName}>📑 Empenho selecionado</Text>
               <TouchableOpacity onPress={() => setCommitmentFile(null)} style={styles.removeFile}>
+                <Text style={styles.removeFileText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          <Text style={styles.fileLabel}>📋 DENF/SE</Text>
+          <TouchableOpacity style={styles.fileButton} onPress={() => pickDocument(setDenfFile, 'DENF/SE')}>
+            <Text style={styles.fileButtonText}>📎 Selecionar Arquivo</Text>
+          </TouchableOpacity>
+          {denfFile && (
+            <View style={styles.filePreview}>
+              <Text style={styles.fileName}>📋 DENF/SE selecionado</Text>
+              <TouchableOpacity onPress={() => setDenfFile(null)} style={styles.removeFile}>
                 <Text style={styles.removeFileText}>✕</Text>
               </TouchableOpacity>
             </View>
@@ -445,7 +502,7 @@ export default function BulkPatrimonyScreen({ navigation }) {
           value={formData.value}
           onChangeText={(text) => setFormData({ ...formData, value: text })}
           placeholder="0,00"
-          keyboardType="numeric"
+          keyboardType="decimal-pad"
           editable={!loading}
         />
 
@@ -460,16 +517,14 @@ export default function BulkPatrimonyScreen({ navigation }) {
           editable={!loading}
         />
 
-        <Text style={styles.label}>Data de Aquisição *</Text>
-        <TouchableOpacity 
-          style={styles.dateInput}
-          onPress={() => showDatepicker('acquisition_date')}
+        {/* DATA AQUISIÇÃO — corrigida com DateInput */}
+        <DateInput
+          label="Data de Aquisição *"
+          value={formData.acquisition_date}
+          onChange={(v) => handleDateChange('acquisition_date', v)}
           disabled={loading}
-        >
-          <Text style={formData.acquisition_date ? styles.dateText : styles.placeholderText}>
-            {formData.acquisition_date || 'Selecionar data'}
-          </Text>
-        </TouchableOpacity>
+          placeholder="Selecionar data"
+        />
 
         <Text style={styles.label}>Departamento *</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.departmentScroll}>
@@ -542,15 +597,13 @@ export default function BulkPatrimonyScreen({ navigation }) {
         />
 
         <Text style={styles.label}>Data Emissão NF (Opcional)</Text>
-        <TouchableOpacity 
-          style={styles.dateInput}
-          onPress={() => showDatepicker('nf_issue_date')}
+        <DateInput
+          label="Data emissão NF (Opcional)"
+          value={formData.nf_issue_date}
+          onChange={(v) => handleDateChange('nf_issue_date', v)}
           disabled={loading}
-        >
-          <Text style={formData.nf_issue_date ? styles.dateText : styles.placeholderText}>
-            {formData.nf_issue_date || 'Selecionar data'}
-          </Text>
-        </TouchableOpacity>
+          placeholder="Selecionar data"
+        />
 
         <TouchableOpacity
           style={[styles.submitButton, loading && styles.buttonDisabled]}
@@ -575,22 +628,21 @@ export default function BulkPatrimonyScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      {/* Date Pickers */}
-      {showDatePicker && (
+      {Platform.OS !== 'web' && showDatePicker && (
         <DateTimePicker
           value={formData.acquisition_date ? new Date(formData.acquisition_date) : new Date()}
           mode="date"
           display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={onDateChange}
+          onChange={onDateChangeMobile}
         />
       )}
 
-      {showNfDatePicker && (
+      {Platform.OS !== 'web' && showNfDatePicker && (
         <DateTimePicker
           value={formData.nf_issue_date ? new Date(formData.nf_issue_date) : new Date()}
           mode="date"
           display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={onDateChange}
+          onChange={onDateChangeMobile}
         />
       )}
     </ScrollView>
@@ -598,249 +650,96 @@ export default function BulkPatrimonyScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-  },
+  container: { flex: 1, backgroundColor: '#f8fafc' },
   header: {
-    backgroundColor: 'white',
-    padding: 20,
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    backgroundColor: 'white', padding: 20, alignItems: 'center',
+    borderBottomWidth: 1, borderBottomColor: '#e5e7eb',
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1f2937',
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginTop: 4,
-  },
-  form: {
-    padding: 20,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 8,
-    marginTop: 16,
-  },
+  title: { fontSize: 24, fontWeight: 'bold', color: '#1f2937' },
+  subtitle: { fontSize: 14, color: '#6b7280', marginTop: 4 },
+  form: { padding: 20 },
+  label: { fontSize: 16, fontWeight: '600', color: '#374151', marginBottom: 8, marginTop: 16 },
   input: {
-    backgroundColor: 'white',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
+    backgroundColor: 'white', borderWidth: 1, borderColor: '#e5e7eb',
+    borderRadius: 8, padding: 12, fontSize: 16,
   },
-  textArea: {
-    minHeight: 80,
-    textAlignVertical: 'top',
-  },
+  textArea: { minHeight: 80, textAlignVertical: 'top' },
   dateInput: {
-    backgroundColor: 'white',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 8,
-    padding: 12,
-    justifyContent: 'center',
-    height: 48,
+    backgroundColor: 'white', borderWidth: 1, borderColor: '#e5e7eb',
+    borderRadius: 8, padding: 12, justifyContent: 'center', height: 48,
   },
-  dateText: {
-    fontSize: 16,
-    color: '#374151',
-  },
-  placeholderText: {
-    fontSize: 16,
-    color: '#9ca3af',
-  },
+  dateText: { fontSize: 16, color: '#374151' },
+  placeholderText: { fontSize: 16, color: '#9ca3af' },
   rangeCard: {
-    backgroundColor: '#dbeafe',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#2563eb',
+    backgroundColor: '#dbeafe', borderRadius: 12, padding: 16,
+    marginBottom: 16, borderWidth: 1, borderColor: '#2563eb',
   },
-  rangeTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1e3a8a',
-    marginBottom: 12,
-  },
-  rangeRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  rangeInput: {
-    flex: 1,
-  },
-  rangeLabel: {
-    fontSize: 12,
-    color: '#1e3a8a',
-    marginBottom: 4,
-    fontWeight: '500',
-  },
+  rangeTitle: { fontSize: 16, fontWeight: 'bold', color: '#1e3a8a', marginBottom: 12 },
+  rangeRow: { flexDirection: 'row', gap: 12 },
+  rangeInput: { flex: 1 },
+  rangeLabel: { fontSize: 12, color: '#1e3a8a', marginBottom: 4, fontWeight: '500' },
   totalBadge: {
-    backgroundColor: '#2563eb',
-    borderRadius: 8,
-    padding: 10,
-    alignItems: 'center',
-    marginTop: 12,
+    backgroundColor: '#2563eb', borderRadius: 8, padding: 10,
+    alignItems: 'center', marginTop: 12,
   },
-  totalBadgeText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
+  totalBadgeText: { color: 'white', fontWeight: 'bold', fontSize: 14 },
+
   fileSection: {
-    backgroundColor: '#fef3c7',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#f59e0b',
+    backgroundColor: '#fef3c7', borderRadius: 12, padding: 16,
+    marginBottom: 16, borderWidth: 1, borderColor: '#f59e0b',
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#92400e',
-    marginBottom: 4,
-  },
-  sectionSubtitle: {
-    fontSize: 12,
-    color: '#b45309',
-    marginBottom: 12,
-  },
+  sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#92400e', marginBottom: 4 },
+  sectionSubtitle: { fontSize: 12, color: '#b45309', marginBottom: 12 },
   fileLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#92400e',
-    marginTop: 12,
-    marginBottom: 6,
+    fontSize: 14, fontWeight: '600', color: '#92400e',
+    marginTop: 12, marginBottom: 6,
   },
-  fileButtons: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 8,
-  },
+  fileButtons: { flexDirection: 'row', gap: 10, marginBottom: 8 },
   fileButton: {
-    backgroundColor: '#f59e0b',
-    padding: 10,
-    borderRadius: 8,
-    flex: 1,
-    alignItems: 'center',
+    backgroundColor: '#f59e0b', padding: 10, borderRadius: 8,
+    flex: 1, alignItems: 'center', marginBottom: 4,
   },
-  fileButtonText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
-  },
+  fileButtonText: { color: 'white', fontSize: 12, fontWeight: '600' },
   filePreview: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'row', alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#fff7ed',
-    padding: 8,
-    borderRadius: 8,
-    marginTop: 8,
+    backgroundColor: '#fff7ed', padding: 8,
+    borderRadius: 8, marginTop: 8,
   },
-  previewImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-  },
-  fileName: {
-    fontSize: 12,
-    color: '#92400e',
-    flex: 1,
-  },
+  previewImage: { width: 60, height: 60, borderRadius: 8 },
+  fileName: { fontSize: 12, color: '#92400e', flex: 1 },
   removeFile: {
-    backgroundColor: '#ef4444',
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: '#ef4444', width: 24, height: 24,
+    borderRadius: 12, alignItems: 'center', justifyContent: 'center',
   },
-  removeFileText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  departmentScroll: {
-    marginVertical: 8,
-    marginBottom: 16,
-  },
+  removeFileText: { color: 'white', fontSize: 12, fontWeight: 'bold' },
+
+  departmentScroll: { marginVertical: 8, marginBottom: 16 },
   departmentButton: {
-    backgroundColor: '#f1f5f9',
-    padding: 10,
-    borderRadius: 8,
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
+    backgroundColor: '#f1f5f9', padding: 10, borderRadius: 8,
+    marginRight: 8, borderWidth: 1, borderColor: '#e5e7eb',
   },
-  departmentButtonSelected: {
-    backgroundColor: '#dbeafe',
-    borderColor: '#2563eb',
-  },
-  departmentButtonText: {
-    fontSize: 12,
-    color: '#374151',
-    fontWeight: '500',
-  },
+  departmentButtonSelected: { backgroundColor: '#dbeafe', borderColor: '#2563eb' },
+  departmentButtonText: { fontSize: 12, color: '#374151', fontWeight: '500' },
   statusContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginVertical: 8,
-    marginBottom: 16,
+    flexDirection: 'row', flexWrap: 'wrap', gap: 8,
+    marginVertical: 8, marginBottom: 16,
   },
   statusButton: {
-    backgroundColor: '#f1f5f9',
-    padding: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
+    backgroundColor: '#f1f5f9', padding: 10, borderRadius: 8,
+    borderWidth: 1, borderColor: '#e5e7eb',
   },
-  statusButtonSelected: {
-    backgroundColor: '#dbeafe',
-    borderColor: '#2563eb',
-  },
-  statusButtonText: {
-    fontSize: 12,
-    color: '#374151',
-    fontWeight: '500',
-  },
+  statusButtonSelected: { backgroundColor: '#dbeafe', borderColor: '#2563eb' },
+  statusButtonText: { fontSize: 12, color: '#374151', fontWeight: '500' },
   submitButton: {
-    backgroundColor: '#059669',
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 24,
-    marginBottom: 12,
+    backgroundColor: '#059669', padding: 16, borderRadius: 8,
+    alignItems: 'center', marginTop: 24, marginBottom: 12,
   },
   cancelButton: {
-    backgroundColor: '#ef4444',
-    padding: 16,
-    borderRadius: 8,
+    backgroundColor: '#ef4444', padding: 16, borderRadius: 8,
     alignItems: 'center',
   },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  submitButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  cancelButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  buttonDisabled: { opacity: 0.6 },
+  submitButtonText: { color: 'white', fontSize: 16, fontWeight: '600' },
+  cancelButtonText: { color: 'white', fontSize: 16, fontWeight: '600' },
 });
