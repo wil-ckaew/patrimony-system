@@ -180,6 +180,14 @@ export default function DashboardScreen({ navigation }) {
         >
           <Text style={styles.actionText}>🏷️ Leilões</Text>
         </TouchableOpacity>
+
+        {/* ✅ NOVO BOTÃO - RELATÓRIOS */}
+        <TouchableOpacity
+          style={[styles.actionButton, { backgroundColor: '#7c3aed' }]}
+          onPress={() => navigation.navigate('Relatorios')}
+        >
+          <Text style={styles.actionText}>📊 Relatórios e Termos</Text>
+        </TouchableOpacity>
       </View>
 
       {stats && (

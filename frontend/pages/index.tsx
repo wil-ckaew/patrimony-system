@@ -15,6 +15,8 @@ import BackupModal from '../components/BackupModal';
 import FleetPrintModal from '../components/FleetPrintModal';
 import PrintMenuModal from '../components/PrintMenuModal';
 import PrintInactiveModal from '../components/PrintInactiveModal';
+import TermoIncorporacaoModal from '../components/TermoIncorporacaoModal';
+import RelatorioFotograficoModal from '../components/RelatorioFotograficoModal';
 import { apiUrl, BACKEND_BASE_URL } from '../lib/api';
 
 interface SearchFilters {
@@ -27,6 +29,8 @@ export default function PatrimonyPage() {
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [showInactiveModal, setShowInactiveModal] = useState(false);
+  const [showTermoIncorporacao, setShowTermoIncorporacao] = useState(false);
+  const [showRelatorioFotografico, setShowRelatorioFotografico] = useState(false);
   const [showFleetPrintModal, setShowFleetPrintModal] = useState(false);
   const [showPrintMenu, setShowPrintMenu] = useState(false);
   const [fleetData, setFleetData] = useState<any[]>([]);
@@ -785,6 +789,14 @@ export default function PatrimonyPage() {
             setShowPrintMenu(false);
             setShowInactiveModal(true);
           }}
+          onTermoIncorporacao={() => {
+            setShowPrintMenu(false);
+            setShowTermoIncorporacao(true);
+          }}
+          onRelatorioFotografico={() => {
+            setShowPrintMenu(false);
+            setShowRelatorioFotografico(true);
+          }}
         />
       )}
 
@@ -798,6 +810,14 @@ export default function PatrimonyPage() {
       )}
       {showInactiveModal && (
         <PrintInactiveModal onClose={() => setShowInactiveModal(false)} />
+      )}
+
+      {showTermoIncorporacao && (
+        <TermoIncorporacaoModal onClose={() => setShowTermoIncorporacao(false)} />
+      )}
+
+      {showRelatorioFotografico && (
+        <RelatorioFotograficoModal onClose={() => setShowRelatorioFotografico(false)} />
       )}
 
       {showBackupModal && (

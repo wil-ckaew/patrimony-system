@@ -15,6 +15,7 @@ import TransferScreen from './screens/TransferScreen';
 import NewPatrimonyScreen from './screens/NewPatrimonyScreen';
 import EditPatrimonyScreen from './screens/EditPatrimonyScreen';
 import BulkPatrimonyScreen from './screens/BulkPatrimonyScreen';
+import RelatoriosScreen from './screens/RelatoriosScreen';
 import FleetScreen from './screens/FleetScreen';
 import LeiloesScreen from './screens/LeiloesScreen';
 import LeilaoDetailScreen from './screens/LeilaoDetailScreen';
@@ -51,6 +52,7 @@ function AppContent() {
             <Stack.Screen name="NewPatrimony" component={NewPatrimonyScreen} options={{ title: 'Novo Bem Patrimonial' }} />
             <Stack.Screen name="EditPatrimony" component={EditPatrimonyScreen} options={{ title: 'Editar Bem Patrimonial' }} />
             <Stack.Screen name="BulkPatrimony" component={BulkPatrimonyScreen} options={{ title: '📦 Cadastro em Massa' }} />
+            <Stack.Screen name="Relatorios" component={RelatoriosScreen} options={{ title: '📊 Relatórios e Termos' }} />
             <Stack.Screen name="Fleet" component={FleetScreen} options={{ title: 'Gestão de Frota' }} />
             <Stack.Screen name="Leiloes" component={LeiloesScreen} options={{ title: 'Leilões' }} />
             <Stack.Screen name="LeilaoDetail" component={LeilaoDetailScreen} options={{ title: 'Detalhes do Leilão' }} />

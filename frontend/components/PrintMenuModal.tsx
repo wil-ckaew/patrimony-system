@@ -5,6 +5,8 @@ interface PrintMenuModalProps {
   onPatrimony: () => void;
   onFleet: () => void;
   onInactive: () => void;
+  onTermoIncorporacao: () => void;
+  onRelatorioFotografico: () => void;
   onClose: () => void;
 }
 
@@ -12,92 +14,44 @@ const PrintMenuModal: React.FC<PrintMenuModalProps> = ({
   onPatrimony,
   onFleet,
   onInactive,
+  onTermoIncorporacao,
+  onRelatorioFotografico,
   onClose
 }) => {
   return (
     <div className={styles.modalOverlay}>
-      <div
-        className={styles.modal}
-        style={{
-          maxWidth: '500px',
-          width: '100%'
-        }}
-      >
+      <div className={styles.modal} style={{ maxWidth: '500px', width: '100%' }}>
         <div className={styles.modalHeader}>
           <h2>Selecionar Relatório</h2>
-
-          <button
-            type="button"
-            className={styles.modalClose}
-            onClick={onClose}
-          >
-            ×
-          </button>
+          <button type="button" className={styles.modalClose} onClick={onClose}>×</button>
         </div>
 
-        <div
-          className={styles.modalBody}
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '15px',
-            padding: '20px'
-          }}
-        >
-          <p
-            style={{
-              textAlign: 'center',
-              marginBottom: '10px'
-            }}
-          >
-            Escolha qual relatório deseja gerar:
-          </p>
+        <div className={styles.modalBody} style={{ display: 'flex', flexDirection: 'column', gap: '15px', padding: '20px' }}>
+          <p style={{ textAlign: 'center', marginBottom: '10px' }}>Escolha qual relatório deseja gerar:</p>
 
-          <button
-            type="button"
-            className={`${styles.btn} ${styles.btnPrimary}`}
-            onClick={onPatrimony}
-            style={{
-              padding: '15px',
-              fontSize: '16px'
-            }}
-          >
+          <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={onPatrimony} style={{ padding: '15px', fontSize: '16px' }}>
             📦 Relatório de Patrimônio
           </button>
 
-          <button
-            type="button"
-            className={`${styles.btn} ${styles.btnSuccess}`}
-            onClick={onFleet}
-            style={{
-              padding: '15px',
-              fontSize: '16px'
-            }}
-          >
+          <button type="button" className={`${styles.btn} ${styles.btnSuccess}`} onClick={onFleet} style={{ padding: '15px', fontSize: '16px' }}>
             🚛 Relatório da Frota
           </button>
 
-          <button
-            type="button"
-            className={`${styles.btn} ${styles.btnDanger || ''}`}
-            onClick={onInactive}
-            style={{
-              padding: '15px',
-              fontSize: '16px',
-              background: '#dc2626',
-              color: '#fff'
-            }}
-          >
+          <button type="button" className={`${styles.btn} ${styles.btnDanger || ''}`} onClick={onInactive} style={{ padding: '15px', fontSize: '16px', background: '#dc2626', color: '#fff' }}>
             📋 Relatório de Inativos
+          </button>
+
+          <button type="button" className={`${styles.btn}`} onClick={onTermoIncorporacao} style={{ padding: '15px', fontSize: '16px', background: '#7c3aed', color: '#fff' }}>
+            📜 Termo de Incorporação
+          </button>
+
+          <button type="button" className={`${styles.btn}`} onClick={onRelatorioFotografico} style={{ padding: '15px', fontSize: '16px', background: '#0891b2', color: '#fff' }}>
+            📸 Relatório Fotográfico
           </button>
         </div>
 
         <div className={styles.modalFooter}>
-          <button
-            type="button"
-            className={`${styles.btn} ${styles.btnSecondary}`}
-            onClick={onClose}
-          >
+          <button type="button" className={`${styles.btn} ${styles.btnSecondary}`} onClick={onClose}>
             Cancelar
           </button>
         </div>
