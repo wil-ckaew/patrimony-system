@@ -63,11 +63,80 @@ export default function PatrimonyListScreen({ navigation }) {
           denfSeFile: item.denf_se_file,
           imageUrl: item.image_url,
           nfIssueDate: item.nf_issue_date,
+          invoiceFile: item.invoice_file || (item.fiscal_documents && item.fiscal_documents[0] && item.fiscal_documents[0].invoice_file) || null,
+          commitmentFile: item.commitment_file || (item.fiscal_documents && item.fiscal_documents[0] && item.fiscal_documents[0].commitment_file) || null,
+          denfFile: item.denf_se_file 
+            || (item.fiscal_documents && item.fiscal_documents.find(d => d.denf_se_file)?.denf_se_file)
+            || null,
+          denfNumber: item.denf_se_number || (item.fiscal_documents && item.fiscal_documents[0] && item.fiscal_documents[0].denf_se_number) || null,
         }));
         console.log('[PL] itens:', mappedData.length);
+        // Log específico para o Notebook 29091
+        const notebook = mappedData.find(i => i.plate === '29091');
+        if (notebook) {
+        }
         setAllPatrimonies(mappedData);
         setPatrimonies(mappedData);
         hasLoadedOnce.current = true;
+
+
+
+        // Buscar detalhes de TODOS os itens (para pegar os anexos)
+        const withDocs = mappedData;
+        
+        if (withDocs.length > 0) {
+          console.log('[PL] Buscando detalhes de', withDocs.length, 'itens...');
+          const details = await Promise.all(
+            toFetch.map(async (item) => {
+              try {
+                console.log('[PL] fetch detalhe', item.id);
+                const resp = await fetch(`${API_BASE_URL}/api/patrimony/${item.id}`, { headers });
+                console.log('[PL] resp.ok', resp.status, item.id);
+                if (resp.ok) {
+                  const full = await resp.json();
+                  console.log('[PL] detalhe', item.id, ':', JSON.stringify({
+                    invoice_file: full.invoice_file,
+                    commitment_file: full.commitment_file,
+                    denf_se_file: full.denf_se_file,
+                    tem_fiscal_docs: !!full.fiscal_documents,
+                    qtd_fiscal_docs: full.fiscal_documents?.length,
+                    denf_no_fiscal: full.fiscal_documents?.[0]?.denf_se_file,
+                  }));
+                  return { id: item.id, full };
+                }
+              } catch (e) {
+                console.log('[PL] Erro ao buscar detalhe', item.id, e);
+              }
+              return null;
+            })
+          );
+          
+          const enriched = mappedData.map(item => {
+            const detail = details.find(d => d && d.id === item.id);
+            if (detail && detail.full) {
+              return {
+                ...item,
+                invoiceFile: item.invoiceFile || detail.full.invoice_file 
+                  || (detail.full.fiscal_documents && detail.full.fiscal_documents[0] && detail.full.fiscal_documents[0].invoice_file) 
+                  || null,
+                commitmentFile: item.commitmentFile || detail.full.commitment_file 
+                  || (detail.full.fiscal_documents && detail.full.fiscal_documents[0] && detail.full.fiscal_documents[0].commitment_file) 
+                  || null,
+                denfFile: item.denfFile || detail.full.denf_se_file 
+                  || (detail.full.fiscal_documents && detail.full.fiscal_documents.find(d => d.denf_se_file)?.denf_se_file)
+                  || null,
+                _debugDenf: detail.full.fiscal_documents?.map(d => d.denf_se_file)
+              };
+            }
+            return item;
+          });
+          
+          console.log('[PL] enriched[0].denfFile:', enriched[0]?.denfFile);
+          console.log('[PL] enriched[0]._debugDenf:', enriched[0]?._debugDenf);
+          setAllPatrimonies(enriched);
+          setPatrimonies(enriched);
+          console.log('[PL] Detalhes mesclados');
+        }
       } else {
         const errorText = await response.text();
         console.log('[PL] erro', response.status, errorText.substring(0, 100));

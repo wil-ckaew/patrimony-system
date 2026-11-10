@@ -19,48 +19,93 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuth } from '../contexts/AuthContext';
 import { API_BASE_URL } from '../config';
 
-console.log('[Edit] 📄 ARQUIVO EditPatrimonyScreen.js CARREGADO');
+console.log('[Edit] 📄 EditPatrimonyScreen.js CARREGADO');
 
 // ============================================================
-// HELPERS DE COMPATIBILIDADE WEB/MOBILE
+// HELPERS WEB/MOBILE
 // ============================================================
-
-// Alerta compatível com web e mobile
 const showAlert = (title, message, onOk) => {
   if (Platform.OS === 'web') {
-    try {
-      window.alert(`${title}\n\n${message}`);
-    } catch (e) {
-      console.log('[Edit] window.alert falhou:', e);
-    }
+    try { window.alert(`${title}\n\n${message}`); } catch (e) {}
     if (onOk) onOk();
   } else {
     Alert.alert(title, message, [{ text: 'OK', onPress: onOk }], { cancelable: false });
   }
 };
 
-// Alerta com confirmação (cancelar/confirmar)
-const showConfirm = (title, message, onConfirm, onCancel) => {
+const showConfirm = (title, message, onConfirm) => {
   if (Platform.OS === 'web') {
-    const confirmed = window.confirm(`${title}\n\n${message}`);
-    if (confirmed && onConfirm) onConfirm();
-    else if (!confirmed && onCancel) onCancel();
+    if (window.confirm(`${title}\n\n${message}`) && onConfirm) onConfirm();
   } else {
-    Alert.alert(
-      title,
-      message,
-      [
-        { text: 'Cancelar', style: 'cancel', onPress: onCancel },
-        { text: 'OK', style: 'destructive', onPress: onConfirm }
-      ]
+    Alert.alert(title, message, [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Confirmar', style: 'destructive', onPress: onConfirm }
+    ]);
+  }
+};
+
+// ============================================================
+// INPUT DE DATA
+// ============================================================
+const DateInput = ({ label, value, onChange, disabled, placeholder }) => {
+  if (Platform.OS === 'web') {
+    return (
+      <View>
+        <Text style={styles.label}>{label}</Text>
+        <input
+          type="date"
+          value={value || ''}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={disabled}
+          style={{
+            backgroundColor: 'white',
+            borderWidth: '2px',
+            borderStyle: 'solid',
+            borderColor: '#e5e7eb',
+            borderRadius: '8px',
+            padding: '10px 12px',
+            fontSize: '16px',
+            marginBottom: '16px',
+            width: '100%',
+            maxWidth: '100%',
+            height: '44px',
+            boxSizing: 'border-box',
+            fontFamily: 'inherit',
+            color: '#374151',
+            appearance: 'none',
+            WebkitAppearance: 'none',
+            MozAppearance: 'none',
+            display: 'block',
+            lineHeight: 'normal',
+          }}
+        />
+      </View>
     );
   }
+
+  return (
+    <View>
+      <Text style={styles.label}>{label}</Text>
+      <TouchableOpacity
+        style={styles.dateInput}
+        onPress={() => onChange('__OPEN_PICKER__')}
+        disabled={disabled}
+      >
+        <Text style={value ? styles.dateText : styles.placeholderText}>
+          {value || placeholder || 'Selecionar data'}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
 };
 
 export default function EditPatrimonyScreen({ route, navigation }) {
   const { patrimony } = route.params;
   const [loading, setLoading] = useState(false);
   const [image, setImage] = useState(patrimony.imageUrl || null);
+  const [invoiceFile, setInvoiceFile] = useState(null);
+  const [commitmentFile, setCommitmentFile] = useState(null);
+  const [denfFile, setDenfFile] = useState(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showNfDatePicker, setShowNfDatePicker] = useState(false);
   const [currentDateField, setCurrentDateField] = useState('');
@@ -83,63 +128,30 @@ export default function EditPatrimonyScreen({ route, navigation }) {
 
   const { token } = useAuth();
 
-  console.log('[Edit] 🎬 Tela renderizada — patrimony.id:', patrimony?.id, '| token:', token ? 'OK' : 'AUSENTE');
-
-  // ============================================================
-  // NAVEGAÇÃO DE VOLTA (compatível com web e mobile)
-  // ============================================================
-  const goBackToList = () => {
-    console.log('[Edit] 🔙 Tentando voltar para a lista...');
-    try {
-      if (navigation.canGoBack && navigation.canGoBack()) {
-        console.log('[Edit] 🔙 goBack()');
-        navigation.goBack();
-      } else {
-        console.log('[Edit] 🔙 não pode goBack, tentando navigate("Patrimonies")');
-        navigation.navigate('Patrimonies');
-      }
-    } catch (e) {
-      console.log('[Edit] ❌ erro na navegação:', e);
-      try {
-        navigation.navigate('Patrimonies');
-      } catch (e2) {
-        console.log('[Edit] ❌ navigate também falhou:', e2);
-      }
-    }
-  };
-
   // ============================================================
   // PERMISSÕES
   // ============================================================
   const verifyPermissions = async () => {
-    // No web, não precisa de permissão
     if (Platform.OS === 'web') return true;
-
     try {
       const cameraPermission = await ImagePicker.getCameraPermissionsAsync();
       if (cameraPermission.status !== 'granted') {
         const newCameraPermission = await ImagePicker.requestCameraPermissionsAsync();
         if (newCameraPermission.status !== 'granted') {
-          showAlert(
-            'Permissão necessária',
-            'Você precisa conceder permissão para usar a câmera.'
-          );
+          showAlert('Permissão necessária', 'Você precisa conceder permissão para usar a câmera.');
           return false;
         }
       }
-
-      const galleryPermission = await ImagePicker.getMediaLibraryPermissionsAsync();
-      if (galleryPermission.status !== 'granted') {
-        const newGalleryPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (newGalleryPermission.status !== 'granted') {
-          showAlert(
-            'Permissão necessária',
-            'Você precisa conceder permissão para acessar a galeria.'
-          );
-          return false;
+      if (Platform.OS === 'ios') {
+        const galleryPermission = await ImagePicker.getMediaLibraryPermissionsAsync();
+        if (galleryPermission.status !== 'granted') {
+          const newGalleryPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (newGalleryPermission.status !== 'granted') {
+            showAlert('Permissão necessária', 'Você precisa conceder permissão para acessar a galeria.');
+            return false;
+          }
         }
       }
-
       return true;
     } catch (error) {
       console.error('Erro ao verificar permissões:', error);
@@ -148,71 +160,83 @@ export default function EditPatrimonyScreen({ route, navigation }) {
   };
 
   // ============================================================
-  // IMAGEM
+  // FOTO DO BEM
   // ============================================================
-  const extractUriFromResult = (result) => {
-    if (result?.canceled === false && result?.assets && result.assets[0]?.uri) {
-      return result.assets[0].uri;
-    }
-    if (result?.cancelled === false && result?.uri) {
-      return result.uri;
-    }
-    return null;
-  };
-
   const takePicture = async () => {
     const hasPermission = await verifyPermissions();
     if (!hasPermission) return;
-
     try {
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
       });
-
-      const uri = extractUriFromResult(result);
-      if (uri) setImage(uri);
+      if (!result.canceled && result.assets && result.assets[0]) {
+        const asset = result.assets[0];
+        setImage(asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri);
+      }
     } catch (error) {
       showAlert('Erro', 'Não foi possível abrir a câmera');
-      console.error('takePicture error', error);
     }
   };
 
   const pickImage = async () => {
     const hasPermission = await verifyPermissions();
     if (!hasPermission) return;
-
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
       });
-
-      const uri = extractUriFromResult(result);
-      if (uri) setImage(uri);
+      if (!result.canceled && result.assets && result.assets[0]) {
+        const asset = result.assets[0];
+        setImage(asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri);
+      }
     } catch (error) {
       showAlert('Erro', 'Não foi possível selecionar a imagem');
-      console.error('pickImage error', error);
     }
   };
 
-  const removeImage = () => setImage(null);
-
   // ============================================================
-  // DATE PICKER
+  // DOCUMENTOS FISCAIS
   // ============================================================
-  const showDatepicker = (field) => {
-    Keyboard.dismiss();
-    setCurrentDateField(field);
-    if (field === 'acquisition_date') setShowDatePicker(true);
-    if (field === 'nf_issue_date') setShowNfDatePicker(true);
+  const pickDocument = async (setter, label) => {
+    const hasPermission = await verifyPermissions();
+    if (!hasPermission) return;
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 0.9,
+        base64: true,
+      });
+      if (!result.canceled && result.assets && result.assets[0]) {
+        const asset = result.assets[0];
+        setter(asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri);
+        console.log(`[Edit] 📎 ${label} selecionado:`, asset.base64 ? 'base64' : asset.uri);
+      }
+    } catch (error) {
+      showAlert('Erro', `Não foi possível selecionar ${label}`);
+    }
   };
 
-  const onDateChange = (event, selectedDate) => {
+  // ============================================================
+  // DATA
+  // ============================================================
+  const handleDateChange = (field, newValue) => {
+    if (newValue === '__OPEN_PICKER__') {
+      setCurrentDateField(field);
+      if (field === 'acquisition_date') setShowDatePicker(true);
+      if (field === 'nf_issue_date') setShowNfDatePicker(true);
+      return;
+    }
+    setFormData(prev => ({ ...prev, [field]: newValue }));
+  };
+
+  const onDateChangeMobile = (event, selectedDate) => {
     const currentField = currentDateField;
     if (currentField === 'acquisition_date') setShowDatePicker(Platform.OS === 'ios');
     if (currentField === 'nf_issue_date') setShowNfDatePicker(Platform.OS === 'ios');
@@ -224,132 +248,195 @@ export default function EditPatrimonyScreen({ route, navigation }) {
   };
 
   // ============================================================
-  // UPLOAD DE IMAGEM — COMPATÍVEL COM WEB E MOBILE
+  // VALOR
   // ============================================================
-  const uploadImageToPatrimony = async (patrimonyId, imageUri) => {
-    console.log('[Edit] 🖼️ Iniciando upload. Platform:', Platform.OS);
-    console.log('[Edit] 🖼️ imageUri (primeiros 100 chars):', imageUri?.substring(0, 100));
+  const handleValueChange = (text) => {
+    let cleaned = text.replace(/[^0-9.,]/g, '');
+    const firstComma = cleaned.indexOf(',');
+    const firstDot = cleaned.indexOf('.');
+    if (firstComma !== -1 && firstDot !== -1) {
+      const first = Math.min(
+        firstComma === -1 ? Infinity : firstComma,
+        firstDot === -1 ? Infinity : firstDot
+      );
+      cleaned = cleaned.substring(0, first + 1) + cleaned.substring(first + 1).replace(/[.,]/g, '');
+    }
+    setFormData({ ...formData, value: cleaned });
+  };
 
+  const parseValueToNumber = (valueStr) => {
+    if (!valueStr) return 0;
+    const normalized = valueStr.replace(',', '.');
+    const parsed = parseFloat(normalized);
+    return isNaN(parsed) ? 0 : parsed;
+  };
+
+  // ============================================================
+  // UPLOAD DA FOTO DO BEM
+  // ============================================================
+  // Menu de anexo (câmera, galeria, arquivo)
+  const pickFiscalDocumentWithMenu = (setter, label) => {
+    if (Platform.OS === 'web') {
+      pickDocument(setter, label);
+      return;
+    }
+
+    Alert.alert(
+      `Anexar ${label}`,
+      'Escolha a origem:',
+      [
+        {
+          text: '📷 Tirar foto',
+          onPress: async () => {
+            try {
+              const cameraPerm = await ImagePicker.getCameraPermissionsAsync();
+              if (cameraPerm.status !== 'granted') {
+                const newPerm = await ImagePicker.requestCameraPermissionsAsync();
+                if (newPerm.status !== 'granted') {
+                  showAlert('Permissão', 'Permissão de câmera negada');
+                  return;
+                }
+              }
+              const result = await ImagePicker.launchCameraAsync({
+                mediaTypes: ['images'],
+                quality: 0.8,
+                base64: true,
+              });
+              if (!result.canceled && result.assets && result.assets[0]) {
+                const asset = result.assets[0];
+                setter(asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri);
+              }
+            } catch (e) {
+              showAlert('Erro', 'Não foi possível tirar a foto');
+            }
+          },
+        },
+        {
+          text: '🖼️ Escolher da galeria',
+          onPress: async () => {
+            try {
+              const libPerm = await ImagePicker.getMediaLibraryPermissionsAsync();
+              if (libPerm.status !== 'granted') {
+                const newPerm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                if (newPerm.status !== 'granted') {
+                  showAlert('Permissão', 'Permissão de galeria negada');
+                  return;
+                }
+              }
+              const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ['images'],
+                quality: 0.8,
+                base64: true,
+              });
+              if (!result.canceled && result.assets && result.assets[0]) {
+                const asset = result.assets[0];
+                setter(asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri);
+              }
+            } catch (e) {
+              showAlert('Erro', 'Não foi possível abrir a galeria');
+            }
+          },
+        },
+        {
+          text: '📎 Escolher arquivo (PDF, imagem)',
+          onPress: () => pickDocument(setter, label),
+        },
+        { text: 'Cancelar', style: 'cancel' },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  const uploadImageToPatrimony = async (patrimonyId, imageUri) => {
+    console.log('[Edit] 📷 ================== UPLOAD FOTO ==================');
     try {
-      const formData = new FormData();
+      const fd = new FormData();
 
       if (Platform.OS === 'web') {
-        // ============ WEB ============
-        console.log('[Edit] 🌐 Modo WEB — convertendo para Blob');
-
-        let blob;
-        let filename = `image_${Date.now()}.jpg`;
-        let mimeType = 'image/jpeg';
-
-        if (imageUri.startsWith('blob:') || imageUri.startsWith('data:')) {
-          // blob: ou data: URL — buscar e converter para Blob
-          const blobResponse = await fetch(imageUri);
-          blob = await blobResponse.blob();
-
-          // Tentar extrair extensão do blob
-          if (blob.type) {
-            mimeType = blob.type;
-            const ext = mimeType.split('/')[1] || 'jpg';
-            filename = `image_${Date.now()}.${ext}`;
-          }
-        } else if (imageUri.startsWith('http')) {
-          // URL http — buscar e converter
-          const blobResponse = await fetch(imageUri);
-          blob = await blobResponse.blob();
-          if (blob.type) {
-            mimeType = blob.type;
-            const ext = mimeType.split('/')[1] || 'jpg';
-            filename = `image_${Date.now()}.${ext}`;
-          }
-        } else {
-          showAlert('Erro', 'Formato de imagem não suportado no navegador.');
-          return false;
-        }
-
-        console.log('[Edit] 🌐 Blob criado:', blob.size, 'bytes, tipo:', mimeType);
-        formData.append('image', blob, filename);
+        const blobResponse = await fetch(imageUri);
+        const blob = await blobResponse.blob();
+        const mimeType = blob.type || 'image/jpeg';
+        const ext = mimeType.split('/')[1] || 'jpg';
+        fd.append('image', blob, `image_${Date.now()}.${ext}`);
       } else {
-        // ============ MOBILE ============
-        console.log('[Edit] 📱 Modo MOBILE');
-
         const rawFilename = imageUri.split('/').pop();
         const uniqueFilename = `${Date.now()}_${rawFilename}`;
-
         let type = 'image/jpeg';
         const lower = rawFilename.toLowerCase();
         if (lower.endsWith('.png')) type = 'image/png';
         if (lower.endsWith('.gif')) type = 'image/gif';
-
-        formData.append('image', {
-          uri: imageUri,
-          name: uniqueFilename,
-          type,
-        });
+        if (lower.endsWith('.heic')) type = 'image/heic';
+        fd.append('image', { uri: imageUri, name: uniqueFilename, type });
       }
 
-      const uploadUrl = `${API_BASE_URL}/api/patrimony/${patrimonyId}/image`;
-      console.log('[Edit] 🌐 POST', uploadUrl);
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
-
-      const uploadResponse = await fetch(uploadUrl, {
+      const url = `${API_BASE_URL}/api/patrimony/${patrimonyId}/image`;
+      const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Authorization': token ? `Bearer ${token}` : '',
-          // NÃO definir Content-Type — o fetch define automaticamente com boundary
-        },
-        body: formData,
-        signal: controller.signal,
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: fd,
       });
 
-      clearTimeout(timeoutId);
-
-      console.log('[Edit] 📡 Upload status:', uploadResponse.status);
-
-      if (uploadResponse.ok) {
-        console.log('[Edit] ✅ Imagem enviada com sucesso');
-        return true;
-      } else {
-        const errorText = await uploadResponse.text();
-        console.log('[Edit] ❌ Falha no upload:', uploadResponse.status, errorText);
-        showAlert('Erro no upload', `HTTP ${uploadResponse.status}\n${errorText}`);
-        return false;
-      }
+      console.log('[Edit] 📡 Status foto:', response.status);
+      return response.ok;
     } catch (error) {
-      console.log('[Edit] ❌ Erro ao enviar imagem:', error);
-      if (error.name === 'AbortError') {
-        showAlert('Timeout', 'O upload da imagem demorou mais de 30s.');
-      } else {
-        showAlert('Erro no upload', `Erro: ${error.message}`);
-      }
+      console.error('[Edit] ❌ Exception foto:', error);
       return false;
     }
   };
 
   // ============================================================
-  // SUBMIT — ATUALIZAR BEM
+  // UPLOAD DE DOCUMENTOS FISCAIS
+  // ============================================================
+  const uploadFiscalDocument = async (patrimonyId, fileUri, docType) => {
+    try {
+      const fd = new FormData();
+
+      if (Platform.OS === 'web') {
+        const blobResponse = await fetch(fileUri);
+        const blob = await blobResponse.blob();
+        const mimeType = blob.type || 'image/jpeg';
+        const ext = mimeType.split('/')[1] || 'jpg';
+        fd.append('file', blob, `${docType}_${Date.now()}.${ext}`);
+      } else {
+        const rawFilename = fileUri.split('/').pop();
+        let type = 'image/jpeg';
+        const lower = rawFilename.toLowerCase();
+        if (lower.endsWith('.png')) type = 'image/png';
+        if (lower.endsWith('.pdf')) type = 'application/pdf';
+        fd.append('file', { uri: fileUri, name: rawFilename, type });
+      }
+
+      const url = `${API_BASE_URL}/api/fiscal-document/${patrimonyId}/${docType}`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: fd,
+      });
+
+      console.log(`[Edit] 📡 Status ${docType}:`, response.status);
+      return response.ok;
+    } catch (error) {
+      console.error(`[Edit] ❌ Exception ${docType}:`, error);
+      return false;
+    }
+  };
+
+  // ============================================================
+  // SUBMIT
   // ============================================================
   const handleSubmit = async () => {
     console.log('[Edit] 🔵 handleSubmit chamado');
-    console.log('[Edit] 📦 formData:', formData);
-    console.log('[Edit] 🔑 token:', token ? `${token.substring(0, 20)}...` : 'AUSENTE');
-    console.log('[Edit] 🆔 patrimony.id:', patrimony?.id);
-    console.log('[Edit] 🌐 API_BASE_URL:', API_BASE_URL);
 
     if (!formData.plate || !formData.name || !formData.department) {
-      console.log('[Edit] ❌ Validação falhou');
       showAlert('Erro', 'Preencha pelo menos placa, nome e departamento');
       return;
     }
 
     if (!token) {
-      console.log('[Edit] ❌ Token ausente');
       showAlert('Sessão expirada', 'Faça login novamente.');
       return;
     }
 
-    console.log('[Edit] ✅ Validação passou, iniciando requisição');
     setLoading(true);
 
     try {
@@ -358,7 +445,7 @@ export default function EditPatrimonyScreen({ route, navigation }) {
         name: formData.name.trim(),
         description: formData.description?.trim() || '',
         acquisition_date: formData.acquisition_date || null,
-        value: formData.value ? parseFloat(formData.value.replace(',', '.')) : 0,
+        value: parseValueToNumber(formData.value),
         department: formData.department,
         status: formData.status,
         sector: formData.sector?.trim() || null,
@@ -371,7 +458,6 @@ export default function EditPatrimonyScreen({ route, navigation }) {
 
       const url = `${API_BASE_URL}/api/patrimony/${patrimony.id}`;
       console.log('[Edit] 🌐 PUT', url);
-      console.log('[Edit] 📤 payload:', JSON.stringify(payload));
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000);
@@ -387,36 +473,94 @@ export default function EditPatrimonyScreen({ route, navigation }) {
       });
 
       clearTimeout(timeoutId);
-
-      console.log('[Edit] 📡 Status HTTP:', response.status);
+      console.log('[Edit] 📡 Status PUT:', response.status);
 
       if (response.ok) {
-        console.log('[Edit] ✅ PUT OK');
+        const patrimonyId = patrimony.id;
 
-        // Fazer upload da imagem se houver nova
-        let imageSuccess = true;
+        // 1. Upload da FOTO (se mudou)
         if (image && image !== patrimony.imageUrl && !image.startsWith('http')) {
-          console.log('[Edit] 🖼️ Nova imagem detectada, fazendo upload');
-          imageSuccess = await uploadImageToPatrimony(patrimony.id, image);
+          console.log('[Edit] 🖼️ Enviando FOTO...');
+          await uploadImageToPatrimony(patrimonyId, image);
         }
 
-        if (imageSuccess) {
-          console.log('[Edit] ✅ Sucesso completo — voltando para lista');
-          showAlert(
-            'Sucesso',
-            'Bem atualizado com sucesso!',
-            () => {
-              console.log('[Edit] 🔙 Executando goBackToList');
-              goBackToList();
+        // 2. DOCUMENTOS FISCAIS
+        if (invoiceFile || commitmentFile || denfFile) {
+          let fiscalDocId = null;
+
+          // Busca o fiscal_document ATUALIZADO do backend
+          try {
+            const fullResp = await fetch(`${API_BASE_URL}/api/patrimony/${patrimonyId}`, {
+              headers: { 'Authorization': `Bearer ${token}` },
+            });
+            if (fullResp.ok) {
+              const full = await fullResp.json();
+              if (full.fiscal_documents && full.fiscal_documents.length > 0) {
+                fiscalDocId = full.fiscal_documents[0].id;
+                console.log('[Edit] 📋 fiscal_document existente encontrado:', fiscalDocId);
+              } else {
+                console.log('[Edit] 📋 Nenhum fiscal_document encontrado, vai criar novo');
+              }
             }
-          );
-        } else {
-          console.log('[Edit] ⚠️ Bem atualizado mas imagem falhou');
-          showAlert(
-            'Atenção',
-            'Bem atualizado, mas a imagem não foi enviada. Tente editar novamente.',
-            () => goBackToList()
-          );
+          } catch (e) {
+            console.log('[Edit] ⚠️ Erro ao buscar fiscal_documents:', e);
+          }
+
+          // Se não achou, cria novo
+          if (!fiscalDocId) {
+            console.log('[Edit] 📋 Criando novo fiscal_document...');
+            try {
+              const fiscalResp = await fetch(`${API_BASE_URL}/api/patrimony/${patrimonyId}/fiscal-document`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  invoice_number: formData.invoice_number.trim() || null,
+                  commitment_number: formData.commitment_number.trim() || null,
+                  denf_se_number: formData.denf_se_number.trim() || null,
+                  nf_issue_date: formData.nf_issue_date || null,
+                }),
+              });
+              console.log('[Edit] 📡 fiscal_document status:', fiscalResp.status);
+              if (fiscalResp.ok) {
+                const fiscalDoc = await fiscalResp.json();
+                fiscalDocId = fiscalDoc.id;
+                console.log('[Edit] ✅ fiscal_document criado:', fiscalDocId);
+              } else {
+                const errText = await fiscalResp.text();
+                console.log('[Edit] ❌ Erro fiscal_document:', errText);
+              }
+            } catch (e) {
+              console.log('[Edit] ❌ Exception fiscal_document:', e);
+            }
+          }
+
+          if (fiscalDocId) {
+            if (invoiceFile) {
+              console.log('[Edit] 📄 Enviando NF...');
+              await uploadFiscalDocument(fiscalDocId, invoiceFile, 'invoice');
+            }
+            if (commitmentFile) {
+              console.log('[Edit] 📑 Enviando Empenho...');
+              await uploadFiscalDocument(fiscalDocId, commitmentFile, 'commitment');
+            }
+            if (denfFile) {
+              console.log('[Edit] 📋 Enviando DENF/SE...');
+              await uploadFiscalDocument(fiscalDocId, denfFile, 'denf');
+            }
+          }
+        }
+
+        // Mostrar o alerta (sem callback)
+        showAlert('Sucesso', 'Bem atualizado com sucesso!');
+
+        // Voltar para a lista (fora do callback)
+        try {
+          navigation.goBack();
+        } catch (e) {
+          navigation.navigate('Patrimonies');
         }
       } else {
         const errorText = await response.text();
@@ -435,6 +579,11 @@ export default function EditPatrimonyScreen({ route, navigation }) {
     }
   };
 
+  const removeImage = () => setImage(null);
+  const removeInvoice = () => setInvoiceFile(null);
+  const removeCommitment = () => setCommitmentFile(null);
+  const removeDenf = () => setDenfFile(null);
+
   // ============================================================
   // DELETE
   // ============================================================
@@ -447,11 +596,13 @@ export default function EditPatrimonyScreen({ route, navigation }) {
         try {
           const response = await fetch(`${API_BASE_URL}/api/patrimony/${patrimony.id}`, {
             method: 'DELETE',
-            headers: { 'Authorization': token ? `Bearer ${token}` : '' },
+            headers: { 'Authorization': `Bearer ${token}` },
           });
 
           if (response.ok) {
-            showAlert('Sucesso', 'Bem excluído com sucesso!', () => goBackToList());
+            showAlert('Sucesso', 'Bem excluído com sucesso!', () => {
+              try { navigation.goBack(); } catch (e) { navigation.navigate('Patrimonies'); }
+            });
           } else {
             const errorText = await response.text();
             showAlert('Erro', errorText || 'Erro ao excluir bem');
@@ -480,7 +631,7 @@ export default function EditPatrimonyScreen({ route, navigation }) {
   const departments = [
     'education', 'health', 'administration', 'urbanism',
     'culture', 'sports', 'transportation', 'finance',
-    'assistenci', 'tourism', 'environment'
+    'assistenci', 'tourism', 'environment', 'instituto_profissoes', 'desenvolvimento', 'government'
   ];
 
   const getDepartmentName = (dept) => {
@@ -496,26 +647,28 @@ export default function EditPatrimonyScreen({ route, navigation }) {
       'assistenci': 'Assistencia Comunitaria',
       'tourism': 'Turismo',
       'environment': 'Meio Ambiente',
+      'instituto_profissoes': 'Instituto de Profissões',
+      'desenvolvimento': 'Desenvolvimento',
+      'government': 'Governo',
     };
     return departmentNames[dept] || dept;
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      keyboardShouldPersistTaps="always"
-      keyboardDismissMode="on-drag"
-    >
+    <ScrollView style={styles.container} keyboardShouldPersistTaps="always">
       <View style={styles.header}>
         <Text style={styles.title}>Editar Bem Patrimonial</Text>
         <Text style={styles.subtitle}>Placa: {patrimony.plate}</Text>
       </View>
 
       <View style={styles.form}>
-        <Text style={styles.label}>Foto do Bem</Text>
+        {/* SEÇÃO DE ANEXOS */}
+        <View style={styles.attachmentSection}>
+          <Text style={styles.attachmentTitle}>📎 Anexos</Text>
 
-        <View style={styles.imageSection}>
-          {image && (
+          {/* FOTO DO BEM */}
+          <Text style={styles.fileLabel}>🖼️ Foto do Bem</Text>
+          {image ? (
             <View style={styles.imagePreviewContainer}>
               <Image source={{ uri: image }} style={styles.imagePreview} />
               <TouchableOpacity
@@ -526,18 +679,73 @@ export default function EditPatrimonyScreen({ route, navigation }) {
                 <Text style={styles.removeImageText}>✕</Text>
               </TouchableOpacity>
             </View>
+          ) : (
+            <View style={styles.imageButtons}>
+              <TouchableOpacity style={styles.imageButton} onPress={takePicture} disabled={loading}>
+                <Text style={styles.imageButtonText}>📷 Tirar Foto</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.imageButton} onPress={pickImage} disabled={loading}>
+                <Text style={styles.imageButtonText}>🖼️ Galeria</Text>
+              </TouchableOpacity>
+            </View>
           )}
 
-          <View style={styles.imageButtons}>
-            <TouchableOpacity style={styles.imageButton} onPress={takePicture} disabled={loading}>
-              <Text style={styles.imageButtonText}>📷 Tirar Foto</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.imageButton} onPress={pickImage} disabled={loading}>
-              <Text style={styles.imageButtonText}>🖼️ Galeria</Text>
-            </TouchableOpacity>
-          </View>
+          {/* NOTA FISCAL */}
+          <Text style={styles.fileLabel}>📄 Nota Fiscal</Text>
+          <TouchableOpacity
+            style={styles.fileButton}
+            onPress={() => pickFiscalDocumentWithMenu(setInvoiceFile, 'Nota Fiscal')}
+            disabled={loading}
+          >
+            <Text style={styles.fileButtonText}>📎 Selecionar Novo Arquivo</Text>
+          </TouchableOpacity>
+          {invoiceFile && (
+            <View style={styles.filePreview}>
+              <Text style={styles.fileName}>📄 NF selecionada</Text>
+              <TouchableOpacity onPress={removeInvoice} style={styles.removeFile}>
+                <Text style={styles.removeFileText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* EMPENHO */}
+          <Text style={styles.fileLabel}>📑 Empenho</Text>
+          <TouchableOpacity
+            style={styles.fileButton}
+            onPress={() => pickFiscalDocumentWithMenu(setCommitmentFile, 'Empenho')}
+            disabled={loading}
+          >
+            <Text style={styles.fileButtonText}>📎 Selecionar Novo Arquivo</Text>
+          </TouchableOpacity>
+          {commitmentFile && (
+            <View style={styles.filePreview}>
+              <Text style={styles.fileName}>📑 Empenho selecionado</Text>
+              <TouchableOpacity onPress={removeCommitment} style={styles.removeFile}>
+                <Text style={styles.removeFileText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* DENF/SE */}
+          <Text style={styles.fileLabel}>📋 DENF/SE</Text>
+          <TouchableOpacity
+            style={styles.fileButton}
+            onPress={() => pickFiscalDocumentWithMenu(setDenfFile, 'DENF/SE')}
+            disabled={loading}
+          >
+            <Text style={styles.fileButtonText}>📎 Selecionar Novo Arquivo</Text>
+          </TouchableOpacity>
+          {denfFile && (
+            <View style={styles.filePreview}>
+              <Text style={styles.fileName}>📋 DENF/SE selecionado</Text>
+              <TouchableOpacity onPress={removeDenf} style={styles.removeFile}>
+                <Text style={styles.removeFileText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
+        {/* FORMULÁRIO */}
         <Text style={styles.label}>Placa *</Text>
         <TextInput
           style={styles.input}
@@ -579,9 +787,7 @@ export default function EditPatrimonyScreen({ route, navigation }) {
               onPress={() => handleInputChange('department', dept)}
               disabled={loading}
             >
-              <Text style={styles.departmentButtonText}>
-                {getDepartmentName(dept)}
-              </Text>
+              <Text style={styles.departmentButtonText}>{getDepartmentName(dept)}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -590,7 +796,7 @@ export default function EditPatrimonyScreen({ route, navigation }) {
         <TextInput
           style={styles.input}
           value={formData.value}
-          onChangeText={(text) => handleInputChange('value', text)}
+          onChangeText={handleValueChange}
           placeholder="0,00"
           keyboardType="decimal-pad"
           editable={!loading}
@@ -613,12 +819,13 @@ export default function EditPatrimonyScreen({ route, navigation }) {
           ))}
         </View>
 
-        <Text style={styles.label}>Data de Aquisição</Text>
-        <TouchableOpacity style={styles.dateInput} onPress={() => showDatepicker('acquisition_date')} disabled={loading}>
-          <Text style={formData.acquisition_date ? styles.dateText : styles.placeholderText}>
-            {formData.acquisition_date || 'Selecionar data'}
-          </Text>
-        </TouchableOpacity>
+        <DateInput
+          label="Data de Aquisição"
+          value={formData.acquisition_date}
+          onChange={(v) => handleDateChange('acquisition_date', v)}
+          disabled={loading}
+          placeholder="Selecionar data"
+        />
 
         <Text style={styles.sectionTitle}>Informações Adicionais</Text>
 
@@ -667,25 +874,19 @@ export default function EditPatrimonyScreen({ route, navigation }) {
           editable={!loading}
         />
 
-        <Text style={styles.label}>Data de Emissão da NF</Text>
-        <TouchableOpacity style={styles.dateInput} onPress={() => showDatepicker('nf_issue_date')} disabled={loading}>
-          <Text style={formData.nf_issue_date ? styles.dateText : styles.placeholderText}>
-            {formData.nf_issue_date || 'Selecionar data'}
-          </Text>
-        </TouchableOpacity>
+        <DateInput
+          label="Data de Emissão da NF"
+          value={formData.nf_issue_date}
+          onChange={(v) => handleDateChange('nf_issue_date', v)}
+          disabled={loading}
+          placeholder="Selecionar data"
+        />
 
         <TouchableOpacity
           style={[styles.button, loading && styles.buttonDisabled]}
           onPress={() => {
-            console.log('🔥 BOTAO CLICADO');
-            if (Platform.OS === 'web') {
-              if (window.confirm('Confirmar atualização do bem?')) {
-                handleSubmit();
-              }
-            } else {
-              alert('BOTAO CLICADO - handleSubmit vai rodar');
-              handleSubmit();
-            }
+            console.log('🔥 BOTAO ATUALIZAR CLICADO');
+            showConfirm('Confirmar Atualização', 'Deseja salvar as alterações?', handleSubmit);
           }}
           disabled={loading}
           activeOpacity={0.7}
@@ -703,21 +904,21 @@ export default function EditPatrimonyScreen({ route, navigation }) {
         </TouchableOpacity>
       </View>
 
-      {showDatePicker && (
+      {Platform.OS !== 'web' && showDatePicker && (
         <DateTimePicker
           value={formData.acquisition_date ? new Date(formData.acquisition_date) : new Date()}
           mode="date"
           display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={onDateChange}
+          onChange={onDateChangeMobile}
         />
       )}
 
-      {showNfDatePicker && (
+      {Platform.OS !== 'web' && showNfDatePicker && (
         <DateTimePicker
           value={formData.nf_issue_date ? new Date(formData.nf_issue_date) : new Date()}
           mode="date"
           display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={onDateChange}
+          onChange={onDateChangeMobile}
         />
       )}
     </ScrollView>
@@ -754,8 +955,57 @@ const styles = StyleSheet.create({
   },
   dateText: { fontSize: 16, color: '#374151' },
   placeholderText: { fontSize: 16, color: '#9ca3af' },
-  imageSection: { marginBottom: 20 },
-  imageButtons: { flexDirection: 'row', gap: 12 },
+
+  attachmentSection: {
+    backgroundColor: '#fef3c7',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#f59e0b',
+  },
+  attachmentTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#92400e',
+    marginBottom: 12,
+  },
+  fileLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#92400e',
+    marginTop: 12,
+    marginBottom: 6,
+  },
+  fileButton: {
+    backgroundColor: '#f59e0b',
+    padding: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  fileButtonText: { color: 'white', fontSize: 13, fontWeight: '600' },
+  filePreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#fff7ed',
+    padding: 8,
+    borderRadius: 8,
+    marginTop: 4,
+  },
+  fileName: { fontSize: 12, color: '#92400e', flex: 1 },
+  removeFile: {
+    backgroundColor: '#ef4444',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeFileText: { color: 'white', fontSize: 12, fontWeight: 'bold' },
+
+  imageButtons: { flexDirection: 'row', gap: 12, marginBottom: 8 },
   imageButton: {
     flex: 1,
     backgroundColor: '#2563eb',
@@ -764,8 +1014,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   imageButtonText: { color: 'white', fontSize: 14, fontWeight: '600' },
-  imagePreviewContainer: { position: 'relative', alignItems: 'center', marginBottom: 12 },
-  imagePreview: { width: 200, height: 200, borderRadius: 8, borderWidth: 2, borderColor: '#e5e7eb' },
+  imagePreviewContainer: { position: 'relative', alignItems: 'center', marginBottom: 8 },
+  imagePreview: {
+    width: 200,
+    height: 200,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+  },
   removeImageButton: {
     position: 'absolute',
     top: -10,
@@ -778,6 +1034,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   removeImageText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
+
   departmentScroll: { marginVertical: 8, marginBottom: 16 },
   departmentButton: {
     backgroundColor: '#f1f5f9',
@@ -789,8 +1046,20 @@ const styles = StyleSheet.create({
   },
   departmentButtonSelected: { backgroundColor: '#dbeafe', borderColor: '#2563eb' },
   departmentButtonText: { fontSize: 12, color: '#374151', fontWeight: '500' },
-  statusContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginVertical: 8, marginBottom: 16 },
-  statusButton: { backgroundColor: '#f1f5f9', padding: 12, borderRadius: 8, borderWidth: 2, borderColor: '#e5e7eb' },
+  statusContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginVertical: 8,
+    marginBottom: 16,
+  },
+  statusButton: {
+    backgroundColor: '#f1f5f9',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+  },
   statusButtonSelected: { backgroundColor: '#dbeafe', borderColor: '#2563eb' },
   statusButtonText: { fontSize: 12, color: '#374151', fontWeight: '500' },
   button: {
@@ -801,7 +1070,12 @@ const styles = StyleSheet.create({
     marginTop: 24,
     marginBottom: 12,
   },
-  deleteButton: { backgroundColor: '#dc2626', padding: 16, borderRadius: 8, alignItems: 'center' },
+  deleteButton: {
+    backgroundColor: '#dc2626',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
   buttonDisabled: { opacity: 0.6 },
   buttonText: { color: 'white', fontSize: 16, fontWeight: '600' },
   deleteButtonText: { color: 'white', fontSize: 16, fontWeight: '600' },

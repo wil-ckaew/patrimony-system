@@ -12,6 +12,7 @@ pub struct FiscalDocument {
     pub commitment_number: Option<String>,
     pub invoice_file: Option<String>,
     pub commitment_file: Option<String>,
+    pub denf_se_file: Option<String>,
     pub nf_issue_date: Option<NaiveDate>,
     pub supplier: Option<String>,
     pub created_at: chrono::DateTime<Utc>,
@@ -24,6 +25,7 @@ pub struct FiscalDocumentRequest {
     pub commitment_number: Option<String>,
     pub invoice_file: Option<String>,
     pub commitment_file: Option<String>,
+    pub denf_se_file: Option<String>,
     pub nf_issue_date: Option<NaiveDate>,
     pub supplier: Option<String>,
 }

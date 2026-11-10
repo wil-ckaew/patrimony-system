@@ -106,6 +106,9 @@ export default function DashboardScreen({ navigation }) {
       'assistenci': 'Assistência Comunitária',
       'tourism': 'Turismo',
       'environment': 'Meio Ambiente',
+      'instituto_profissoes': 'Instituto de Profissões',
+      'desenvolvimento': 'Desenvolvimento',
+      'government': 'Governo',
     };
     return departmentNames[dept] || dept;
   };

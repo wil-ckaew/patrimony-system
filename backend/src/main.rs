@@ -169,6 +169,7 @@ async fn main() -> std::io::Result<()> {
                     .route("/patrimony/{id}/fiscal-document", web::post().to(patrimony::create_fiscal_document))
                     .route("/fiscal-document/{id}/invoice", web::post().to(patrimony::upload_fiscal_document_invoice))
                     .route("/fiscal-document/{id}/commitment", web::post().to(patrimony::upload_fiscal_document_commitment))
+                    .route("/fiscal-document/{id}/denf", web::post().to(patrimony::upload_fiscal_document_denf))
                     .route("/patrimony/check-plate", web::get().to(patrimony::check_plate_exists))
                     // TRANSFER
                     .route("/transfer", web::post().to(handlers::transfer_patrimony))

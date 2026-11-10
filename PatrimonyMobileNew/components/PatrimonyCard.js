@@ -1,6 +1,6 @@
 // components/PatrimonyCard.js
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, Linking } from 'react-native';
 import { API_BASE_URL } from '../config';
 
 export default function PatrimonyCard({ item, onPress }) {
@@ -49,6 +49,8 @@ export default function PatrimonyCard({ item, onPress }) {
     }).format(value);
   };
 
+  console.log('[Card]', item.plate, 'denfFile:', item.denfFile, '_debugDenf:', item._debugDenf);
+
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
       {item.imageUrl ? (
@@ -93,13 +95,58 @@ export default function PatrimonyCard({ item, onPress }) {
           <Text style={styles.value}>{formatValue(item.value)}</Text>
         )}
         
-        {(item.invoiceNumber || item.commitmentNumber) && (
+        {(item.invoiceNumber || item.commitmentNumber || item.denfNumber) && (
           <View style={styles.fiscalInfo}>
             {item.invoiceNumber && (
               <Text style={styles.fiscalText}>NF: {item.invoiceNumber}</Text>
             )}
             {item.commitmentNumber && (
               <Text style={styles.fiscalText}>Empenho: {item.commitmentNumber}</Text>
+            )}
+            {item.denfNumber && (
+              <TouchableOpacity
+                onPress={() => {
+                  if (item.denfFile) {
+                    const url = item.denfFile.startsWith('http')
+                      ? item.denfFile
+                      : `${API_BASE_URL}${item.denfFile}`;
+                    Linking.openURL(url).catch(err => console.log('Erro ao abrir DFD:', err));
+                  }
+                }}
+                disabled={!item.denfFile}
+              >
+                <Text style={[
+                  styles.fiscalText,
+                  item.denfFile && styles.fiscalLink
+                ]}>
+                  DFD: {item.denfNumber}
+                  {item.denfFile ? ' 🔗' : ''}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        {/* Ícones de anexos (só mostra se existir) */}
+        {(item.invoiceFile || item.commitmentFile || item.denfFile) && (
+          <View style={styles.attachments}>
+            {item.invoiceFile && (
+              <View style={styles.attachmentBadge}>
+                <Text style={styles.attachmentIcon}>📄</Text>
+                <Text style={styles.attachmentLabel}>NF</Text>
+              </View>
+            )}
+            {item.commitmentFile && (
+              <View style={styles.attachmentBadge}>
+                <Text style={styles.attachmentIcon}>📑</Text>
+                <Text style={styles.attachmentLabel}>Empenho</Text>
+              </View>
+            )}
+            {item.denfFile && (
+              <View style={styles.attachmentBadge}>
+                <Text style={styles.attachmentIcon}>📋</Text>
+                <Text style={styles.attachmentLabel}>DFD</Text>
+              </View>
             )}
           </View>
         )}
@@ -213,5 +260,38 @@ const styles = StyleSheet.create({
   fiscalText: {
     fontSize: 11,
     color: '#6b7280',
+  },
+  fiscalLink: {
+    fontSize: 11,
+    color: '#2563eb',
+    textDecorationLine: 'underline',
+    fontWeight: '600',
+  },
+  attachments: {
+    flexDirection: 'row',
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+    gap: 8,
+  },
+  attachmentBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#eff6ff',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  attachmentIcon: {
+    fontSize: 12,
+    marginRight: 4,
+  },
+  attachmentLabel: {
+    fontSize: 10,
+    color: '#1e40af',
+    fontWeight: '600',
   },
 });

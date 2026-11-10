@@ -83,6 +83,8 @@ export default function Dashboard() {
           <option value="desenvolve">Desenvolvimento</option>
           <option value="tourism">Turismo</option>
           <option value="environment">Meio Ambiente</option>
+          <option value="instituto_profissoes">Instituto de Profissões</option>
+          <option value="desenvolvimento">Desenvolvimento</option>
           <option value="government">Governo</option>
         </select>
       </div>

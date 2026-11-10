@@ -14,6 +14,7 @@ import { getAuthHeaders } from '../utils/auth';
 import BackupModal from '../components/BackupModal';
 import FleetPrintModal from '../components/FleetPrintModal';
 import PrintMenuModal from '../components/PrintMenuModal';
+import PrintInactiveModal from '../components/PrintInactiveModal';
 import { apiUrl, BACKEND_BASE_URL } from '../lib/api';
 
 interface SearchFilters {
@@ -25,6 +26,7 @@ export default function PatrimonyPage() {
   const [showBulkForm, setShowBulkForm] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showPrintModal, setShowPrintModal] = useState(false);
+  const [showInactiveModal, setShowInactiveModal] = useState(false);
   const [showFleetPrintModal, setShowFleetPrintModal] = useState(false);
   const [showPrintMenu, setShowPrintMenu] = useState(false);
   const [fleetData, setFleetData] = useState<any[]>([]);
@@ -327,6 +329,8 @@ export default function PatrimonyPage() {
                   <option value="assistenci">Assistencia Comunitaria</option>
                   <option value="tourism">Turismo</option>
                   <option value="environment">Meio Ambiente</option>
+                  <option value="instituto_profissoes">Instituto de Profissões</option>
+                  <option value="desenvolvimento">Desenvolvimento</option>
                   <option value="government">Governo</option>
                 </select>
               </div>
@@ -777,6 +781,10 @@ export default function PatrimonyPage() {
             setShowPrintMenu(false);
             setShowFleetPrintModal(true);
           }}
+          onInactive={() => {
+            setShowPrintMenu(false);
+            setShowInactiveModal(true);
+          }}
         />
       )}
 
@@ -788,6 +796,10 @@ export default function PatrimonyPage() {
           sectors={sectors}
         />
       )}
+      {showInactiveModal && (
+        <PrintInactiveModal onClose={() => setShowInactiveModal(false)} />
+      )}
+
       {showBackupModal && (
         <BackupModal onClose={() => setShowBackupModal(false)} />
       )}

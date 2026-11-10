@@ -4,12 +4,14 @@ import styles from './PatrimonyPage.module.css';
 interface PrintMenuModalProps {
   onPatrimony: () => void;
   onFleet: () => void;
+  onInactive: () => void;
   onClose: () => void;
 }
 
 const PrintMenuModal: React.FC<PrintMenuModalProps> = ({
   onPatrimony,
   onFleet,
+  onInactive,
   onClose
 }) => {
   return (
@@ -21,7 +23,6 @@ const PrintMenuModal: React.FC<PrintMenuModalProps> = ({
           width: '100%'
         }}
       >
-        {/* Cabeçalho */}
         <div className={styles.modalHeader}>
           <h2>Selecionar Relatório</h2>
 
@@ -34,7 +35,6 @@ const PrintMenuModal: React.FC<PrintMenuModalProps> = ({
           </button>
         </div>
 
-        {/* Corpo */}
         <div
           className={styles.modalBody}
           style={{
@@ -76,9 +76,22 @@ const PrintMenuModal: React.FC<PrintMenuModalProps> = ({
           >
             🚛 Relatório da Frota
           </button>
+
+          <button
+            type="button"
+            className={`${styles.btn} ${styles.btnDanger || ''}`}
+            onClick={onInactive}
+            style={{
+              padding: '15px',
+              fontSize: '16px',
+              background: '#dc2626',
+              color: '#fff'
+            }}
+          >
+            📋 Relatório de Inativos
+          </button>
         </div>
 
-        {/* Rodapé */}
         <div className={styles.modalFooter}>
           <button
             type="button"

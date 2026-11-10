@@ -43,7 +43,12 @@ const showConfirm = (title, message, onConfirm, onCancel) => {
 };
 
 export default function PatrimonyDetailScreen({ route, navigation }) {
+  const [pdfUrl, setPdfUrl] = useState(null);
   const { item } = route.params;
+
+  // DEBUG: ver o que chega no Detail
+  if (Platform.OS === 'web') {
+  }
   const { token } = useAuth();
   const [deleting, setDeleting] = useState(false);
 
@@ -228,10 +233,10 @@ export default function PatrimonyDetailScreen({ route, navigation }) {
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>DENF/SE:</Text>
             <TouchableOpacity
-              onPress={() => viewFile(item.denfSeFile, 'DENF/SE')}
-              disabled={!item.denfSeFile}
+              onPress={() => viewFile(item.denfFile, 'DENF/SE')}
+              disabled={!item.denfFile}
             >
-              <Text style={[styles.infoValue, item.denfSeFile && styles.link]}>
+              <Text style={[styles.infoValue, item.denfFile && styles.link]}>
                 {item.denfSeNumber || 'Não informado'}
               </Text>
             </TouchableOpacity>

@@ -207,3 +207,23 @@ backend/.env.*
 corrigir_porta.sh
 restore_completo.sh
 verificar-seguranca.sh
+
+# ============================================================
+# ARQUIVOS DE BACKUP E CÓPIAS (NÃO VERSIONAR)
+# ============================================================
+*.bkp-*
+*.bkp
+*_copia*
+*_copia.*
+* copy*
+* (Cópia)*
+PatrimonyMobileNew/*.bkp-*
+PatrimonyMobileNew/screens/*.bkp-*
+PatrimonyMobileNew/components/*.bkp-*
+backend/src/*.bkp-*
+backend/src/handlers/*.bkp-*
+backend/src/models/*.bkp-*
+frontend/components/*.bkp-*
+frontend/pages/*_copia*
+frontend/types/*.bkp-*
+PatrimonyMobileNew/.npmrc.save

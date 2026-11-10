@@ -40,6 +40,8 @@ export default function PatrimonyForm({ item, onClose, onRefresh }: PatrimonyFor
   const [newDocIssueDate, setNewDocIssueDate] = useState('');
   const [newDocInvoiceFile, setNewDocInvoiceFile] = useState<File | null>(null);
   const [newDocCommitmentFile, setNewDocCommitmentFile] = useState<File | null>(null);
+  const [newDocDenfNumber, setNewDocDenfNumber] = useState('');
+  const [newDocDenfFile, setNewDocDenfFile] = useState<File | null>(null);
   const [showFiscalSection, setShowFiscalSection] = useState(false);
 
   // Estado para OCR
@@ -84,6 +86,28 @@ export default function PatrimonyForm({ item, onClose, onRefresh }: PatrimonyFor
       setNewDocIssueDate(formData.nf_issue_date || '');
     }
   }, [showFiscalSection, formData.invoice_number, formData.commitment_number, formData.nf_issue_date]);
+
+  // ==================== HELPER: normaliza data para YYYY-MM-DD ====================
+  const toDateInput = (value?: string | null): string => {
+    if (!value) return '';
+    const s = String(value).trim();
+    // Já está no formato YYYY-MM-DD?
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    // Tem 'T' (ISO)? pega só a parte da data
+    if (s.includes('T')) return s.split('T')[0];
+    // Formato DD/MM/YYYY?
+    const br = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (br) return `${br[3]}-${br[2]}-${br[1]}`;
+    // Tenta Date()
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+    return '';
+  };
 
   // ==================== CARREGAR DADOS DO ITEM PARA EDIÇÃO ====================
   useEffect(() => {
@@ -149,24 +173,35 @@ export default function PatrimonyForm({ item, onClose, onRefresh }: PatrimonyFor
         let loadedFiscalDocuments: FiscalDocument[] = [];
 
         if (data.fiscal_documents && data.fiscal_documents.length > 0) {
-          loadedFiscalDocuments = data.fiscal_documents.map((doc: any) => ({
+          loadedFiscalDocuments = data.fiscal_documents.map((doc: any, idx: number) => ({
             id: doc.id || `doc-${Date.now()}`,
             invoiceNumber: doc.invoice_number || '',
             commitmentNumber: doc.commitment_number || '',
-            issueDate: doc.issue_date || doc.nf_issue_date || '',
+            // Data: primeiro tenta do doc, depois da raiz (só no primeiro doc)
+            issueDate: toDateInput(
+              doc.issue_date || doc.nf_issue_date || (idx === 0 ? data.nf_issue_date : '')
+            ),
             invoiceFile: doc.invoice_file || '',
             commitmentFile: doc.commitment_file || '',
+            // DFD: primeiro tenta do doc, depois da raiz (só no primeiro doc)
+            denfNumber: doc.denf_se_number || doc.denf_number
+                        || (idx === 0 ? (data.denf_se_number || '') : ''),
+            denfFile: doc.denf_se_file || doc.denf_file
+                      || (idx === 0 ? (data.denf_se_file || '') : ''),
             isLegacy: false,
           }));
           setShowFiscalSection(true);
-        } else if (data.invoice_number || data.commitment_number || data.invoice_file || data.commitment_file) {
+        } else if (data.invoice_number || data.commitment_number || data.invoice_file || data.commitment_file
+                   || data.denf_se_number || data.denf_se_file) {
           loadedFiscalDocuments = [{
             id: 'legacy',
             invoiceNumber: data.invoice_number || '',
             commitmentNumber: data.commitment_number || '',
-            issueDate: data.nf_issue_date || '',
+            issueDate: toDateInput(data.nf_issue_date),
             invoiceFile: data.invoice_file || '',
             commitmentFile: data.commitment_file || '',
+            denfNumber: data.denf_se_number || data.denf_number || '',
+            denfFile: data.denf_se_file || data.denf_file || '',
             isLegacy: true,
           }];
           setShowFiscalSection(true);
@@ -197,14 +232,17 @@ export default function PatrimonyForm({ item, onClose, onRefresh }: PatrimonyFor
         if (item.fiscalDocuments && item.fiscalDocuments.length > 0) {
           setFiscalDocuments(item.fiscalDocuments);
           setShowFiscalSection(true);
-        } else if (item.invoiceNumber || item.commitmentNumber || item.invoiceFile || item.commitmentFile) {
+        } else if (item.invoiceNumber || item.commitmentNumber || item.invoiceFile || item.commitmentFile
+                   || item.denfSeNumber || (item as any).denfFile) {
           setFiscalDocuments([{
             id: 'legacy',
             invoiceNumber: item.invoiceNumber || '',
             commitmentNumber: item.commitmentNumber || '',
-            issueDate: item.nfIssueDate || '',
+            issueDate: toDateInput(item.nfIssueDate),
             invoiceFile: item.invoiceFile || '',
             commitmentFile: item.commitmentFile || '',
+            denfNumber: item.denfSeNumber || (item as any).denf_se_number || '',
+            denfFile: (item as any).denfFile || (item as any).denf_se_file || '',
             isLegacy: true,
           }]);
           setShowFiscalSection(true);
@@ -271,8 +309,11 @@ export default function PatrimonyForm({ item, onClose, onRefresh }: PatrimonyFor
       issueDate: newDocIssueDate || undefined,
       invoiceFile: newDocInvoiceFile ? URL.createObjectURL(newDocInvoiceFile) : undefined,
       commitmentFile: newDocCommitmentFile ? URL.createObjectURL(newDocCommitmentFile) : undefined,
+      denfNumber: newDocDenfNumber.trim() || undefined,
+      denfFile: newDocDenfFile ? URL.createObjectURL(newDocDenfFile) : undefined,
       _invoiceFile: newDocInvoiceFile || undefined,
       _commitmentFile: newDocCommitmentFile || undefined,
+      _denfFile: newDocDenfFile || undefined,
     };
     setFiscalDocuments([...fiscalDocuments, newDoc]);
     // Limpa os campos após adicionar
@@ -281,6 +322,8 @@ export default function PatrimonyForm({ item, onClose, onRefresh }: PatrimonyFor
     setNewDocIssueDate('');
     setNewDocInvoiceFile(null);
     setNewDocCommitmentFile(null);
+    setNewDocDenfNumber('');
+    setNewDocDenfFile(null);
   };
 
   const removeFiscalDocument = (index: number) => {
@@ -307,6 +350,13 @@ export default function PatrimonyForm({ item, onClose, onRefresh }: PatrimonyFor
     const updated = [...fiscalDocuments];
     updated[index].commitmentFile = URL.createObjectURL(file);
     updated[index]._commitmentFile = file;
+    setFiscalDocuments(updated);
+  };
+
+  const handleDocDenfFileChange = (index: number, file: File) => {
+    const updated = [...fiscalDocuments];
+    updated[index].denfFile = URL.createObjectURL(file);
+    updated[index]._denfFile = file;
     setFiscalDocuments(updated);
   };
 
@@ -375,6 +425,9 @@ export default function PatrimonyForm({ item, onClose, onRefresh }: PatrimonyFor
         if (doc._commitmentFile) {
           await uploadDocumentToServer(patrimonyId, doc._commitmentFile, 'commitment', doc);
         }
+        if (doc._denfFile) {
+          await uploadDocumentToServer(patrimonyId, doc._denfFile, 'denf', doc);
+        }
       }
       return true;
     } catch (error) {
@@ -439,6 +492,8 @@ export default function PatrimonyForm({ item, onClose, onRefresh }: PatrimonyFor
           issue_date: doc.issueDate,
           invoice_file: isServerFileUrl(doc.invoiceFile) ? doc.invoiceFile : undefined,
           commitment_file: isServerFileUrl(doc.commitmentFile) ? doc.commitmentFile : undefined,
+          denf_se_number: doc.denfNumber,
+          denf_se_file: isServerFileUrl(doc.denfFile) ? doc.denfFile : undefined,
         }));
       }
 
@@ -1063,8 +1118,29 @@ export default function PatrimonyForm({ item, onClose, onRefresh }: PatrimonyFor
                         />
                       </div>
                     </div>
+                    <div style={styles.formRow}>
+                      <div style={styles.formGroup}>
+                        <label style={styles.formLabel}>Nº DFD</label>
+                        <input
+                          type="text"
+                          value={newDocDenfNumber}
+                          onChange={(e) => setNewDocDenfNumber(e.target.value)}
+                          placeholder="Ex: 162021"
+                          style={styles.formInput}
+                        />
+                      </div>
+                      <div style={styles.formGroup}>
+                        <label style={styles.formLabel}>Arquivo DFD</label>
+                        <input
+                          type="file"
+                          accept=".pdf,image/*"
+                          onChange={(e) => setNewDocDenfFile(e.target.files?.[0] || null)}
+                          style={styles.formInput}
+                        />
+                      </div>
+                    </div>
                     <button type="button" onClick={addFiscalDocument} style={styles.addButton}>
-                      + Adicionar Par (NF + Empenho)
+                      + Adicionar Documento Fiscal (NF + Empenho + DFD)
                     </button>
                   </div>
                 </div>
@@ -1143,6 +1219,35 @@ export default function PatrimonyForm({ item, onClose, onRefresh }: PatrimonyFor
                         )}
                         {doc._commitmentFile && (
                           <div style={styles.filePreview}>📎 {doc._commitmentFile.name}</div>
+                        )}
+                      </div>
+                    </div>
+                    <div style={styles.formRow}>
+                      <div style={styles.formGroup}>
+                        <label style={styles.formLabel}>Nº DFD</label>
+                        <input
+                          type="text"
+                          value={doc.denfNumber || ''}
+                          onChange={(e) => updateFiscalDocument(idx, 'denfNumber', e.target.value)}
+                          placeholder="Ex: 162021"
+                          style={styles.formInput}
+                        />
+                      </div>
+                      <div style={styles.formGroup}>
+                        <label style={styles.formLabel}>Arquivo DFD</label>
+                        <input
+                          type="file"
+                          accept=".pdf,image/*"
+                          onChange={(e) => e.target.files?.[0] && handleDocDenfFileChange(idx, e.target.files[0])}
+                          style={styles.formInput}
+                        />
+                        {doc.denfFile && !doc._denfFile && (
+                          <a href={`${BACKEND_BASE_URL}${doc.denfFile}`} target="_blank" rel="noopener noreferrer" style={styles.fileLink}>
+                            📎 Ver DFD atual
+                          </a>
+                        )}
+                        {doc._denfFile && (
+                          <div style={styles.filePreview}>📎 {doc._denfFile.name}</div>
                         )}
                       </div>
                     </div>

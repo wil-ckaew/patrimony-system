@@ -525,6 +525,66 @@ pub async fn upload_fiscal_document_commitment(
     HttpResponse::BadRequest().json("Nenhum arquivo fornecido")
 }
 
+// Endpoint para upload do DFD/DENF do documento fiscal
+pub async fn upload_fiscal_document_denf(
+    pool: web::Data<PgPool>,
+    id: web::Path<Uuid>,
+    mut payload: Multipart,
+    req: HttpRequest,
+) -> HttpResponse {
+    let _user = match auth_middleware(&req, pool.get_ref()).await {
+        Ok(Some(user)) => user,
+        Ok(None) => return HttpResponse::Unauthorized().json("Authentication required"),
+        Err(e) => return e,
+    };
+
+    let fiscal_doc_id = id.into_inner();
+    
+    while let Ok(Some(mut field)) = payload.try_next().await {
+        let filename = field.content_disposition().get_filename().unwrap_or("document.pdf").to_string();
+        
+        let docs_dir = "./documents";
+        if !Path::new(docs_dir).exists() {
+            if let Err(_e) = fs::create_dir_all(docs_dir) {
+                return HttpResponse::InternalServerError().json("Erro ao criar diretório");
+            }
+        }
+
+        let file_extension = Path::new(&filename).extension().and_then(|ext| ext.to_str()).unwrap_or("pdf");
+        let new_filename = format!("fiscal_denf_{}_{}.{}", fiscal_doc_id, Uuid::new_v4(), file_extension);
+        let filepath = format!("{}/{}", docs_dir, new_filename);
+
+        let mut file = match File::create(&filepath).await {
+            Ok(f) => f,
+            Err(_e) => return HttpResponse::InternalServerError().json("Erro ao salvar arquivo"),
+        };
+
+        while let Ok(Some(chunk)) = field.try_next().await {
+            if let Err(_e) = file.write_all(&chunk).await {
+                return HttpResponse::InternalServerError().json("Erro ao salvar dados");
+            }
+        }
+
+        let document_url = format!("/documents/{}", new_filename);
+        
+        let result = sqlx::query("UPDATE fiscal_documents SET denf_se_file = $1 WHERE id = $2")
+            .bind(&document_url)
+            .bind(fiscal_doc_id)
+            .execute(pool.get_ref())
+            .await;
+
+        match result {
+            Ok(_) => return HttpResponse::Ok().json(serde_json::json!({
+                "message": "Arquivo enviado com sucesso",
+                "file_url": document_url
+            })),
+            Err(_e) => return HttpResponse::InternalServerError().json("Erro ao atualizar documento"),
+        }
+    }
+    
+    HttpResponse::BadRequest().json("Nenhum arquivo fornecido")
+}
+
 pub async fn restore_backup(
     pool: web::Data<PgPool>,
     req: HttpRequest,
@@ -771,7 +831,7 @@ fn normalize_optional_string(value: Option<String>) -> Option<String> {
 
 async fn get_fiscal_documents(pool: &PgPool, patrimony_id: Uuid) -> Result<Vec<FiscalDocument>, sqlx::Error> {
     sqlx::query(
-        "SELECT id, patrimony_id, invoice_number, commitment_number, invoice_file, commitment_file, nf_issue_date, supplier, created_at, updated_at FROM fiscal_documents WHERE patrimony_id = $1 ORDER BY created_at"
+        "SELECT id, patrimony_id, invoice_number, commitment_number, invoice_file, commitment_file, denf_se_file, nf_issue_date, supplier, created_at, updated_at FROM fiscal_documents WHERE patrimony_id = $1 ORDER BY created_at"
     )
     .bind(patrimony_id)
     .map(|row: PgRow| FiscalDocument {
@@ -781,6 +841,7 @@ async fn get_fiscal_documents(pool: &PgPool, patrimony_id: Uuid) -> Result<Vec<F
         commitment_number: row.get("commitment_number"),
         invoice_file: row.get("invoice_file"),
         commitment_file: row.get("commitment_file"),
+        denf_se_file: row.get("denf_se_file"),
         nf_issue_date: row.get("nf_issue_date"),
         supplier: row.get("supplier"),
         created_at: row.get("created_at"),
@@ -798,7 +859,7 @@ async fn get_fiscal_documents_for_patrimonies(pool: &PgPool, patrimony_ids: &[Uu
     }
 
     let docs = sqlx::query(
-        "SELECT id, patrimony_id, invoice_number, commitment_number, invoice_file, commitment_file, nf_issue_date, supplier, created_at, updated_at FROM fiscal_documents WHERE patrimony_id = ANY($1) ORDER BY patrimony_id, created_at"
+        "SELECT id, patrimony_id, invoice_number, commitment_number, invoice_file, commitment_file, denf_se_file, nf_issue_date, supplier, created_at, updated_at FROM fiscal_documents WHERE patrimony_id = ANY($1) ORDER BY patrimony_id, created_at"
     )
     .bind(patrimony_ids)
     .map(|row: PgRow| FiscalDocument {
@@ -808,6 +869,7 @@ async fn get_fiscal_documents_for_patrimonies(pool: &PgPool, patrimony_ids: &[Uu
         commitment_number: row.get("commitment_number"),
         invoice_file: row.get("invoice_file"),
         commitment_file: row.get("commitment_file"),
+        denf_se_file: row.get("denf_se_file"),
         nf_issue_date: row.get("nf_issue_date"),
         supplier: row.get("supplier"),
         created_at: row.get("created_at"),
@@ -861,7 +923,7 @@ async fn insert_fiscal_documents(pool: &PgPool, patrimony_id: Uuid, docs: &[Fisc
 
         let doc_id = Uuid::new_v4();
         sqlx::query(
-            "INSERT INTO fiscal_documents (id, patrimony_id, invoice_number, commitment_number, invoice_file, commitment_file, nf_issue_date, supplier) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"
+            "INSERT INTO fiscal_documents (id, patrimony_id, invoice_number, commitment_number, invoice_file, commitment_file, denf_se_file, nf_issue_date, supplier) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)"
         )
         .bind(doc_id)
         .bind(patrimony_id)
@@ -869,6 +931,7 @@ async fn insert_fiscal_documents(pool: &PgPool, patrimony_id: Uuid, docs: &[Fisc
         .bind(&commitment_number)
         .bind(&invoice_file)
         .bind(&commitment_file)
+        .bind(&doc.denf_se_file)
         .bind(&doc.nf_issue_date)
         .bind(&supplier)
         .execute(pool)
@@ -901,15 +964,17 @@ async fn maybe_migrate_legacy_documents(pool: &PgPool, patrimony_id: Uuid) -> Re
         let commitment_number: Option<String> = normalize_optional_string(row.get("commitment_number"));
         let invoice_file: Option<String> = normalize_optional_string(row.get("invoice_file"));
         let commitment_file: Option<String> = normalize_optional_string(row.get("commitment_file"));
+        let denf_se_file: Option<String> = normalize_optional_string(row.get("denf_se_file"));
         let nf_issue_date: Option<NaiveDate> = row.get("nf_issue_date");
         let supplier: Option<String> = normalize_optional_string(row.get("supplier"));
 
-        if invoice_number.is_some() || commitment_number.is_some() || invoice_file.is_some() || commitment_file.is_some() || nf_issue_date.is_some() || supplier.is_some() {
+        if invoice_number.is_some() || commitment_number.is_some() || invoice_file.is_some() || commitment_file.is_some() || denf_se_file.is_some() || nf_issue_date.is_some() || supplier.is_some() {
             let doc = FiscalDocumentRequest {
                 invoice_number,
                 commitment_number,
                 invoice_file,
                 commitment_file,
+                denf_se_file,
                 nf_issue_date,
                 supplier,
             };

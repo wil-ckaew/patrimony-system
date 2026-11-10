@@ -41,11 +41,15 @@ export interface FiscalDocument {
   commitmentNumber: string;
   commitmentFile?: string;
   commitmentFileName?: string;
+  denfNumber?: string;
+  denfFile?: string;
+  denfFileName?: string;
   issueDate?: string;
   isLegacy?: boolean;
 
   _invoiceFile?: File;
   _commitmentFile?: File;
+  _denfFile?: File;
 }
 
 // =========================

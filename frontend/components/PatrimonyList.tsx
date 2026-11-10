@@ -121,9 +121,15 @@ export default function PatrimonyList({
         invoiceNumber: item.invoice_number || undefined,
         commitmentNumber: item.commitment_number || undefined,
         denfSeNumber: item.denf_se_number || undefined,
-        invoiceFile: item.invoice_file || undefined,
-        commitmentFile: item.commitment_file || undefined,
-        denfSeFile: item.denf_se_file || undefined,
+        invoiceFile: item.invoice_file 
+          || (item.fiscal_documents && item.fiscal_documents[0] && item.fiscal_documents[0].invoice_file) 
+          || undefined,
+        commitmentFile: item.commitment_file 
+          || (item.fiscal_documents && item.fiscal_documents[0] && item.fiscal_documents[0].commitment_file) 
+          || undefined,
+        denfSeFile: item.denf_se_file 
+          || (item.fiscal_documents && item.fiscal_documents[0] && item.fiscal_documents[0].denf_se_file) 
+          || undefined,
         imageUrl: item.image_url || undefined,
         sector: item.sector,
         nfIssueDate: item.nf_issue_date,

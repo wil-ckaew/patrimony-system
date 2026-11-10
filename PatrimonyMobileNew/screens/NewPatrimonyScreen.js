@@ -44,7 +44,7 @@ const showConfirm = (title, message, onConfirm) => {
 };
 
 // ============================================================
-// INPUT DE DATA — WEB usa <input type="date">, MOBILE usa TouchableOpacity
+// INPUT DE DATA
 // ============================================================
 const DateInput = ({ label, value, onChange, disabled, placeholder }) => {
   if (Platform.OS === 'web') {
@@ -126,8 +126,6 @@ export default function NewPatrimonyScreen({ navigation }) {
 
   const { token } = useAuth();
 
-  console.log('[New] 🎬 Tela renderizada | Platform:', Platform.OS);
-
   // ============================================================
   // PERMISSÕES
   // ============================================================
@@ -160,7 +158,7 @@ export default function NewPatrimonyScreen({ navigation }) {
   };
 
   // ============================================================
-  // SELEÇÃO DE IMAGEM (FOTO DO BEM)
+  // FOTO DO BEM — câmera e galeria
   // ============================================================
   const takePicture = async () => {
     const hasPermission = await verifyPermissions();
@@ -172,10 +170,14 @@ export default function NewPatrimonyScreen({ navigation }) {
         aspect: [4, 3],
         quality: 0.8,
       });
+      console.log('[New] 📷 takePicture result:', JSON.stringify(result));
       if (!result.canceled && result.assets && result.assets[0]) {
-        setImage(result.assets[0].uri);
+        console.log('[New] 📷 Foto capturada:', result.assets[0].uri);
+        const asset = result.assets[0];
+        setImage(asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri);
       }
     } catch (error) {
+      console.error('[New] ❌ takePicture erro:', error);
       showAlert('Erro', 'Não foi possível abrir a câmera');
     }
   };
@@ -191,7 +193,8 @@ export default function NewPatrimonyScreen({ navigation }) {
         quality: 0.8,
       });
       if (!result.canceled && result.assets && result.assets[0]) {
-        setImage(result.assets[0].uri);
+        const asset = result.assets[0];
+        setImage(asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri);
       }
     } catch (error) {
       showAlert('Erro', 'Não foi possível selecionar a imagem');
@@ -199,7 +202,7 @@ export default function NewPatrimonyScreen({ navigation }) {
   };
 
   // ============================================================
-  // SELEÇÃO DE DOCUMENTOS (NF, EMPENHO, DENF)
+  // DOCUMENTOS FISCAIS
   // ============================================================
   const pickDocument = async (setter, label) => {
     const hasPermission = await verifyPermissions();
@@ -209,10 +212,12 @@ export default function NewPatrimonyScreen({ navigation }) {
         mediaTypes: ['images'],
         allowsEditing: false,
         quality: 0.9,
+        base64: true,
       });
       if (!result.canceled && result.assets && result.assets[0]) {
-        setter(result.assets[0].uri);
-        console.log(`[New] 📎 ${label} selecionado:`, result.assets[0].uri);
+        const asset = result.assets[0];
+        setter(asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri);
+        console.log(`[New] 📎 ${label} selecionado:`, asset.base64 ? 'base64' : asset.uri);
       }
     } catch (error) {
       showAlert('Erro', `Não foi possível selecionar ${label}`);
@@ -268,55 +273,204 @@ export default function NewPatrimonyScreen({ navigation }) {
   };
 
   // ============================================================
-  // UPLOAD DE ARQUIVO (web/mobile)
+  // UPLOAD DA FOTO DO BEM — ENDPOINT CORRETO
   // ============================================================
-  const uploadFile = async (patrimonyId, fileUri, endpointType) => {
+  const uploadImageToPatrimony = async (patrimonyId, imageUri) => {
+    console.log('[New] 📷 ================== UPLOAD FOTO ==================');
+    console.log('[New] 📷 patrimonyId:', patrimonyId);
+    console.log('[New] 📷 imageUri:', imageUri);
+    console.log('[New] 📷 Platform:', Platform.OS);
+
     try {
       const fd = new FormData();
 
       if (Platform.OS === 'web') {
-        console.log(`[New] 🌐 Upload web ${endpointType} — convertendo para Blob`);
-        const blobResponse = await fetch(fileUri);
+        console.log('[New] 🌐 Modo WEB — convertendo para Blob');
+        const blobResponse = await fetch(imageUri);
         const blob = await blobResponse.blob();
         const mimeType = blob.type || 'image/jpeg';
         const ext = mimeType.split('/')[1] || 'jpg';
-        fd.append('file', blob, `${endpointType}_${Date.now()}.${ext}`);
+        const filename = `image_${Date.now()}.${ext}`;
+        fd.append('image', blob, filename);
+        console.log('[New] 🌐 Blob:', blob.size, 'bytes, tipo:', mimeType);
       } else {
-        const filename = fileUri.split('/').pop();
+        console.log('[New] 📱 Modo MOBILE');
+        const rawFilename = imageUri.split('/').pop();
+        const uniqueFilename = `${Date.now()}_${rawFilename}`;
         let type = 'image/jpeg';
-        const lower = filename.toLowerCase();
+        const lower = rawFilename.toLowerCase();
         if (lower.endsWith('.png')) type = 'image/png';
-        if (lower.endsWith('.pdf')) type = 'application/pdf';
-        if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) type = 'image/jpeg';
-        fd.append('file', { uri: fileUri, name: filename, type });
+        if (lower.endsWith('.gif')) type = 'image/gif';
+        if (lower.endsWith('.heic')) type = 'image/heic';
+        fd.append('image', {
+          uri: imageUri,
+          name: uniqueFilename,
+          type,
+        });
+        console.log('[New] 📱 Campo "image":', uniqueFilename, type);
       }
 
-      const url = `${API_BASE_URL}/api/patrimony/fiscal-document/${patrimonyId}/${endpointType}`;
-      console.log(`[New] POST ${endpointType} para:`, url);
+      const url = `${API_BASE_URL}/api/patrimony/${patrimonyId}/image`;
+      console.log('[New] 📡 POST', url);
 
       const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
         body: fd,
       });
 
+      console.log('[New] 📡 Status:', response.status);
+
       if (response.ok) {
-        console.log(`[New] ✅ ${endpointType} enviado`);
+        const responseText = await response.text();
+        console.log('[New] ✅ Foto enviada:', responseText.substring(0, 200));
         return true;
       } else {
         const errorText = await response.text();
-        console.log(`[New] ❌ Falha ${endpointType}:`, response.status, errorText);
+        console.log('[New] ❌ Erro foto:', response.status, errorText);
         return false;
       }
     } catch (error) {
-      console.log(`[New] ❌ Erro ${endpointType}:`, error);
+      console.error('[New] ❌ Exception upload foto:', error);
       return false;
     }
   };
 
-  const uploadImageToPatrimony = (patrimonyId, imageUri) => {
-    // Reusa a mesma função para imagem do bem
-    return uploadFile(patrimonyId, imageUri, 'image');
+  // ============================================================
+  // MENU DE ANEXO (câmera, galeria, arquivo) para documentos
+  // ============================================================
+  const pickFiscalDocumentWithMenu = (setter, label) => {
+    if (Platform.OS === 'web') {
+      // No web, o Alert.alert não funciona. Usa o pickDocument (seletor de arquivos)
+      // que no iOS inclui "Tirar foto" e "Galeria"
+      pickDocument(setter, label);
+      return;
+    }
+
+    Alert.alert(
+      `Anexar ${label}`,
+      'Escolha a origem:',
+      [
+        {
+          text: '📷 Tirar foto',
+          onPress: async () => {
+            try {
+              const cameraPerm = await ImagePicker.getCameraPermissionsAsync();
+              if (cameraPerm.status !== 'granted') {
+                const newPerm = await ImagePicker.requestCameraPermissionsAsync();
+                if (newPerm.status !== 'granted') {
+                  showAlert('Permissão', 'Permissão de câmera negada');
+                  return;
+                }
+              }
+              const result = await ImagePicker.launchCameraAsync({
+                mediaTypes: ['images'],
+                quality: 0.8,
+                base64: true,
+              });
+              if (!result.canceled && result.assets && result.assets[0]) {
+                const asset = result.assets[0];
+                setter(asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri);
+              }
+            } catch (e) {
+              showAlert('Erro', 'Não foi possível tirar a foto');
+            }
+          },
+        },
+        {
+          text: '🖼️ Escolher da galeria',
+          onPress: async () => {
+            try {
+              const libPerm = await ImagePicker.getMediaLibraryPermissionsAsync();
+              if (libPerm.status !== 'granted') {
+                const newPerm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                if (newPerm.status !== 'granted') {
+                  showAlert('Permissão', 'Permissão de galeria negada');
+                  return;
+                }
+              }
+              const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ['images'],
+                quality: 0.8,
+                base64: true,
+              });
+              if (!result.canceled && result.assets && result.assets[0]) {
+                const asset = result.assets[0];
+                setter(asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri);
+              }
+            } catch (e) {
+              showAlert('Erro', 'Não foi possível abrir a galeria');
+            }
+          },
+        },
+        {
+          text: '📎 Escolher arquivo (PDF, imagem)',
+          onPress: () => pickDocument(setter, label),
+        },
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  // ============================================================
+  // UPLOAD DE DOCUMENTOS FISCAIS (NF, EMPENHO, DENF/SE)
+  // ============================================================
+  const uploadFiscalDocument = async (patrimonyId, fileUri, docType) => {
+    console.log(`[New] 📎 ================== UPLOAD ${docType.toUpperCase()} ==================`);
+
+    try {
+      const fd = new FormData();
+
+      if (Platform.OS === 'web') {
+        const blobResponse = await fetch(fileUri);
+        const blob = await blobResponse.blob();
+        const mimeType = blob.type || 'image/jpeg';
+        const ext = mimeType.split('/')[1] || 'jpg';
+        fd.append('file', blob, `${docType}_${Date.now()}.${ext}`);
+      } else {
+        const rawFilename = fileUri.split('/').pop();
+        let type = 'image/jpeg';
+        const lower = rawFilename.toLowerCase();
+        if (lower.endsWith('.png')) type = 'image/png';
+        if (lower.endsWith('.pdf')) type = 'application/pdf';
+        fd.append('file', {
+          uri: fileUri,
+          name: rawFilename,
+          type,
+        });
+      }
+
+      const url = `${API_BASE_URL}/api/fiscal-document/${patrimonyId}/${docType}`;
+      console.log(`[New] 📡 POST ${docType}:`, url);
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: fd,
+      });
+
+      console.log(`[New] 📡 Status ${docType}:`, response.status);
+
+      if (response.ok) {
+        console.log(`[New] ✅ ${docType} enviado`);
+        return true;
+      } else {
+        const errorText = await response.text();
+        console.log(`[New] ❌ Erro ${docType}:`, response.status, errorText);
+        return false;
+      }
+    } catch (error) {
+      console.log(`[New] ❌ Exception ${docType}:`, error);
+      return false;
+    }
   };
 
   // ============================================================
@@ -325,6 +479,10 @@ export default function NewPatrimonyScreen({ navigation }) {
   const handleSubmit = async () => {
     console.log('[New] 🔵 handleSubmit chamado');
     console.log('[New] 📦 formData:', formData);
+    console.log('[New] 🖼️ image:', image);
+    console.log('[New] 📄 invoiceFile:', invoiceFile);
+    console.log('[New] 📑 commitmentFile:', commitmentFile);
+    console.log('[New] 📋 denfFile:', denfFile);
 
     if (!formData.plate || !formData.name || !formData.department) {
       showAlert('Erro', 'Preencha pelo menos placa, nome e departamento');
@@ -371,29 +529,68 @@ export default function NewPatrimonyScreen({ navigation }) {
         const patrimonyId = responseData.id;
 
         if (patrimonyId) {
-          // Upload de todos os arquivos
-          const uploads = [];
-          if (image) uploads.push(uploadFile(patrimonyId, image, 'image'));
-          if (invoiceFile) uploads.push(uploadFile(patrimonyId, invoiceFile, 'invoice'));
-          if (commitmentFile) uploads.push(uploadFile(patrimonyId, commitmentFile, 'commitment'));
-          if (denfFile) uploads.push(uploadFile(patrimonyId, denfFile, 'denf'));
+          // 1. Upload da FOTO DO BEM
+          if (image) {
+            console.log('[New] 🖼️ Enviando FOTO DO BEM...');
+            await uploadImageToPatrimony(patrimonyId, image);
+          }
 
-          if (uploads.length > 0) {
-            const results = await Promise.all(uploads);
-            const falhas = results.filter(r => r === false).length;
-            if (falhas > 0) {
-              console.log(`[New] ⚠️ ${falhas} arquivo(s) falharam`);
+          // 2. Criar o DOCUMENTO FISCAL (se tiver pelo menos um anexo)
+          if (invoiceFile || commitmentFile || denfFile) {
+            console.log('[New] 📋 Criando fiscal_document...');
+            try {
+              const fiscalResp = await fetch(`${API_BASE_URL}/api/patrimony/${patrimonyId}/fiscal-document`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  invoice_number: formData.invoice_number.trim() || null,
+                  commitment_number: formData.commitment_number.trim() || null,
+                  denf_se_number: formData.denf_se_number.trim() || null,
+                  nf_issue_date: formData.nf_issue_date || null,
+                }),
+              });
+
+              console.log('[New] 📡 fiscal_document status:', fiscalResp.status);
+
+              if (fiscalResp.ok) {
+                const fiscalDoc = await fiscalResp.json();
+                const fiscalDocId = fiscalDoc.id;
+                console.log('[New] ✅ fiscal_document criado:', fiscalDocId);
+
+                if (invoiceFile) {
+                  console.log('[New] 📄 Enviando NF...');
+                  await uploadFiscalDocument(fiscalDocId, invoiceFile, 'invoice');
+                }
+                if (commitmentFile) {
+                  console.log('[New] 📑 Enviando Empenho...');
+                  await uploadFiscalDocument(fiscalDocId, commitmentFile, 'commitment');
+                }
+                if (denfFile) {
+                  console.log('[New] 📋 Enviando DENF/SE...');
+                  await uploadFiscalDocument(fiscalDocId, denfFile, 'denf');
+                }
+              } else {
+                const errText = await fiscalResp.text();
+                console.log('[New] ❌ Erro ao criar fiscal_document:', errText);
+              }
+            } catch (e) {
+              console.log('[New] ❌ Exception fiscal_document:', e);
             }
           }
         }
 
-        showAlert('Sucesso', 'Bem cadastrado com sucesso!', () => {
-          try {
-            navigation.goBack();
-          } catch (e) {
-            navigation.navigate('Patrimonies');
-          }
-        });
+        // Mostrar o alerta (sem callback)
+        showAlert('Sucesso', 'Bem cadastrado com sucesso!');
+
+        // Voltar para a lista (fora do callback)
+        try {
+          navigation.goBack();
+        } catch (e) {
+          navigation.navigate('Patrimonies');
+        }
       } else {
         const errorText = await response.text();
         console.log('[New] ❌ Erro do servidor:', errorText);
@@ -415,7 +612,7 @@ export default function NewPatrimonyScreen({ navigation }) {
   const departments = [
     'education', 'health', 'administration', 'urbanism',
     'culture', 'sports', 'transportation', 'finance',
-    'assistenci', 'tourism', 'environment'
+    'assistenci', 'tourism', 'environment', 'instituto_profissoes', 'desenvolvimento', 'government'
   ];
 
   const statusOptions = [
@@ -438,6 +635,9 @@ export default function NewPatrimonyScreen({ navigation }) {
       'assistenci': 'Assistencia Comunitaria',
       'tourism': 'Turismo',
       'environment': 'Meio Ambiente',
+      'instituto_profissoes': 'Instituto de Profissões',
+      'desenvolvimento': 'Desenvolvimento',
+      'government': 'Governo',
     };
     return departmentNames[dept] || dept;
   };
@@ -449,9 +649,7 @@ export default function NewPatrimonyScreen({ navigation }) {
       </View>
 
       <View style={styles.form}>
-        {/* ============================================ */}
         {/* SEÇÃO DE ANEXOS */}
-        {/* ============================================ */}
         <View style={styles.attachmentSection}>
           <Text style={styles.attachmentTitle}>📎 Anexos (Opcional)</Text>
 
@@ -483,10 +681,10 @@ export default function NewPatrimonyScreen({ navigation }) {
           <Text style={styles.fileLabel}>📄 Nota Fiscal</Text>
           <TouchableOpacity
             style={styles.fileButton}
-            onPress={() => pickDocument(setInvoiceFile, 'Nota Fiscal')}
+            onPress={() => pickFiscalDocumentWithMenu(setInvoiceFile, 'Nota Fiscal')}
             disabled={loading}
           >
-            <Text style={styles.fileButtonText}>📎 Selecionar Arquivo</Text>
+            <Text style={styles.fileButtonText}>📎 Anexar (Foto / Galeria / Arquivo)</Text>
           </TouchableOpacity>
           {invoiceFile && (
             <View style={styles.filePreview}>
@@ -501,10 +699,10 @@ export default function NewPatrimonyScreen({ navigation }) {
           <Text style={styles.fileLabel}>📑 Empenho</Text>
           <TouchableOpacity
             style={styles.fileButton}
-            onPress={() => pickDocument(setCommitmentFile, 'Empenho')}
+            onPress={() => pickFiscalDocumentWithMenu(setCommitmentFile, 'Empenho')}
             disabled={loading}
           >
-            <Text style={styles.fileButtonText}>📎 Selecionar Arquivo</Text>
+            <Text style={styles.fileButtonText}>📎 Anexar (Foto / Galeria / Arquivo)</Text>
           </TouchableOpacity>
           {commitmentFile && (
             <View style={styles.filePreview}>
@@ -519,10 +717,10 @@ export default function NewPatrimonyScreen({ navigation }) {
           <Text style={styles.fileLabel}>📋 DENF/SE</Text>
           <TouchableOpacity
             style={styles.fileButton}
-            onPress={() => pickDocument(setDenfFile, 'DENF/SE')}
+            onPress={() => pickFiscalDocumentWithMenu(setDenfFile, 'DENF/SE')}
             disabled={loading}
           >
-            <Text style={styles.fileButtonText}>📎 Selecionar Arquivo</Text>
+            <Text style={styles.fileButtonText}>📎 Anexar (Foto / Galeria / Arquivo)</Text>
           </TouchableOpacity>
           {denfFile && (
             <View style={styles.filePreview}>
@@ -534,9 +732,7 @@ export default function NewPatrimonyScreen({ navigation }) {
           )}
         </View>
 
-        {/* ============================================ */}
         {/* FORMULÁRIO */}
-        {/* ============================================ */}
         <Text style={styles.label}>Placa *</Text>
         <TextInput
           style={styles.input}
@@ -676,11 +872,7 @@ export default function NewPatrimonyScreen({ navigation }) {
           style={[styles.submitButton, loading && styles.buttonDisabled]}
           onPress={() => {
             console.log('🔥 BOTAO CADASTRAR CLICADO');
-            showConfirm(
-              'Confirmar Cadastro',
-              'Deseja cadastrar este bem?',
-              handleSubmit
-            );
+            showConfirm('Confirmar Cadastro', 'Deseja cadastrar este bem?', handleSubmit);
           }}
           disabled={loading}
         >
@@ -729,90 +921,147 @@ const styles = StyleSheet.create({
   label: { fontSize: 16, fontWeight: '600', color: '#374151', marginBottom: 8, marginTop: 16 },
   hint: { fontSize: 12, color: '#9ca3af', marginTop: -12, marginBottom: 16, fontStyle: 'italic' },
   input: {
-    backgroundColor: 'white', borderWidth: 2, borderColor: '#e5e7eb',
-    borderRadius: 8, padding: 12, fontSize: 16, marginBottom: 16,
+    backgroundColor: 'white',
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    marginBottom: 16,
   },
   dateInput: {
-    backgroundColor: 'white', borderWidth: 2, borderColor: '#e5e7eb',
-    borderRadius: 8, padding: 12, fontSize: 16, marginBottom: 16,
-    justifyContent: 'center', height: 48,
+    backgroundColor: 'white',
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    marginBottom: 16,
+    justifyContent: 'center',
+    height: 48,
   },
   dateText: { fontSize: 16, color: '#374151' },
   placeholderText: { fontSize: 16, color: '#9ca3af' },
   textArea: { minHeight: 80, textAlignVertical: 'top' },
 
-  // Seção de anexos
   attachmentSection: {
-    backgroundColor: '#fef3c7', borderRadius: 12, padding: 16,
-    marginBottom: 20, borderWidth: 1, borderColor: '#f59e0b',
+    backgroundColor: '#fef3c7',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#f59e0b',
   },
   attachmentTitle: {
-    fontSize: 16, fontWeight: 'bold', color: '#92400e', marginBottom: 12,
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#92400e',
+    marginBottom: 12,
   },
   fileLabel: {
-    fontSize: 14, fontWeight: '600', color: '#92400e',
-    marginTop: 12, marginBottom: 6,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#92400e',
+    marginTop: 12,
+    marginBottom: 6,
   },
   fileButton: {
-    backgroundColor: '#f59e0b', padding: 10, borderRadius: 8,
-    alignItems: 'center', marginBottom: 8,
+    backgroundColor: '#f59e0b',
+    padding: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 8,
   },
   fileButtonText: { color: 'white', fontSize: 13, fontWeight: '600' },
   filePreview: {
-    flexDirection: 'row', alignItems: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#fff7ed', padding: 8,
-    borderRadius: 8, marginTop: 4,
+    backgroundColor: '#fff7ed',
+    padding: 8,
+    borderRadius: 8,
+    marginTop: 4,
   },
   fileName: { fontSize: 12, color: '#92400e', flex: 1 },
   removeFile: {
-    backgroundColor: '#ef4444', width: 24, height: 24,
-    borderRadius: 12, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#ef4444',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   removeFileText: { color: 'white', fontSize: 12, fontWeight: 'bold' },
 
-  // Foto do bem
   imageButtons: { flexDirection: 'row', gap: 12, marginBottom: 8 },
   imageButton: {
-    flex: 1, backgroundColor: '#2563eb', padding: 12,
-    borderRadius: 8, alignItems: 'center',
+    flex: 1,
+    backgroundColor: '#2563eb',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
   },
   imageButtonText: { color: 'white', fontSize: 14, fontWeight: '600' },
   imagePreviewContainer: { position: 'relative', alignItems: 'center', marginBottom: 8 },
   imagePreview: {
-    width: 200, height: 200, borderRadius: 8,
-    borderWidth: 2, borderColor: '#e5e7eb',
+    width: 200,
+    height: 200,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
   },
   removeImageButton: {
-    position: 'absolute', top: -10, right: -10,
-    backgroundColor: '#ef4444', width: 30, height: 30,
-    borderRadius: 15, justifyContent: 'center', alignItems: 'center',
+    position: 'absolute',
+    top: -10,
+    right: -10,
+    backgroundColor: '#ef4444',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   removeImageText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
 
   departmentScroll: { marginVertical: 8, marginBottom: 16 },
   departmentButton: {
-    backgroundColor: '#f1f5f9', padding: 12, borderRadius: 8,
-    marginRight: 8, borderWidth: 2, borderColor: '#e5e7eb',
+    backgroundColor: '#f1f5f9',
+    padding: 12,
+    borderRadius: 8,
+    marginRight: 8,
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
   },
   departmentButtonSelected: { backgroundColor: '#dbeafe', borderColor: '#2563eb' },
   departmentButtonText: { fontSize: 12, color: '#374151', fontWeight: '500' },
   statusContainer: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: 8,
-    marginVertical: 8, marginBottom: 16,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginVertical: 8,
+    marginBottom: 16,
   },
   statusButton: {
-    backgroundColor: '#f1f5f9', padding: 12, borderRadius: 8,
-    borderWidth: 2, borderColor: '#e5e7eb',
+    backgroundColor: '#f1f5f9',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
   },
   statusButtonSelected: { backgroundColor: '#dbeafe', borderColor: '#2563eb' },
   statusButtonText: { fontSize: 12, color: '#374151', fontWeight: '500' },
   submitButton: {
-    backgroundColor: '#059669', padding: 16, borderRadius: 8,
-    alignItems: 'center', marginTop: 24, marginBottom: 12,
+    backgroundColor: '#059669',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 24,
+    marginBottom: 12,
   },
   cancelButton: {
-    backgroundColor: '#ef4444', padding: 16, borderRadius: 8,
+    backgroundColor: '#ef4444',
+    padding: 16,
+    borderRadius: 8,
     alignItems: 'center',
   },
   buttonDisabled: { opacity: 0.6 },
