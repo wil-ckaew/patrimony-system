@@ -24,6 +24,7 @@ export default function PatrimonyForm({ item, onClose, onRefresh }: PatrimonyFor
     commitment_number: '',
     denf_se_number: '',
     sector: '',
+    notes: '',
     nf_issue_date: '',
     supplier: '',
     is_vehicle: false
@@ -124,6 +125,7 @@ export default function PatrimonyForm({ item, onClose, onRefresh }: PatrimonyFor
         commitment_number: '',
         denf_se_number: '',
         sector: '',
+    notes: '',
         nf_issue_date: '',
         supplier: '',
         is_vehicle: false
@@ -161,6 +163,7 @@ export default function PatrimonyForm({ item, onClose, onRefresh }: PatrimonyFor
           commitment_number: data.commitment_number || '',
           denf_se_number: data.denf_se_number || '',
           sector: data.sector || '',
+          notes: data.notes || '',
           nf_issue_date: data.nf_issue_date ? data.nf_issue_date.split('T')[0] : '',
           supplier: data.supplier || '',
           is_vehicle: data.is_vehicle || false,
@@ -480,6 +483,7 @@ export default function PatrimonyForm({ item, onClose, onRefresh }: PatrimonyFor
         commitment_number: formData.commitment_number.trim(),
         denf_se_number: formData.denf_se_number.trim(),
         sector: formData.sector.trim() || undefined,
+        notes: formData.notes.trim() || undefined,
         nf_issue_date: nfIssueDate,
         supplier: formData.supplier.trim() || undefined,
         is_vehicle: formData.is_vehicle,
@@ -955,6 +959,17 @@ export default function PatrimonyForm({ item, onClose, onRefresh }: PatrimonyFor
                   placeholder="Ex: Almoxarifado, Sala 101"
                 />
               </div>
+
+        <div style={styles.formGroup}>
+          <label style={styles.formLabel}>Observações (Localização)</label>
+          <textarea
+            name="notes"
+            value={formData.notes}
+            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+            style={{ ...styles.formTextarea, minHeight: '60px' }}
+            placeholder="Ex: Instalado na Sala do Vice-Prefeito"
+          />
+        </div>
               <div style={styles.formGroup}>
                 <label style={{ ...styles.formLabel, display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <input

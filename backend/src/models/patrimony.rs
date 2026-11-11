@@ -76,7 +76,8 @@ pub struct Patrimony {
     pub commitment_file: Option<String>,         // ✅ Arquivo empenho
     pub denf_se_file: Option<String>,            // ✅ Arquivo DENF/SE
     pub image_url: Option<String>,
-    pub sector: Option<String>,                  // ✅ NOVO CAMPO: Setor
+    pub sector: Option<String>,
+    pub notes: Option<String>,                  // ✅ NOVO CAMPO: Setor
     pub nf_issue_date: Option<NaiveDate>,        // ✅ NOVO CAMPO: Data emissão NF
     pub supplier: Option<String>,                // ✅ NOVO CAMPO: Fornecedor
     pub is_vehicle: bool,                        // ✅ NOVO CAMPO: flag para veículos
@@ -102,7 +103,8 @@ pub struct CreatePatrimony {
     pub invoice_number: Option<String>,          // ✅ Campo de documento
     pub commitment_number: Option<String>,       // ✅ Campo de documento
     pub denf_se_number: Option<String>,          // ✅ Campo de documento
-    pub sector: Option<String>,                  // ✅ NOVO CAMPO: Setor
+    pub sector: Option<String>,
+    pub notes: Option<String>,                  // ✅ NOVO CAMPO: Setor
     pub nf_issue_date: Option<NaiveDate>,        // ✅ NOVO CAMPO: Data emissão NF
     pub supplier: Option<String>,                // ✅ NOVO CAMPO: Fornecedor
     pub is_vehicle: Option<bool>,                 // indica se o bem é veículo
@@ -122,7 +124,8 @@ pub struct UpdatePatrimony {
     pub invoice_number: Option<String>,          // ✅ Campo de documento
     pub commitment_number: Option<String>,       // ✅ Campo de documento
     pub denf_se_number: Option<String>,          // ✅ Campo de documento
-    pub sector: Option<String>,                  // ✅ NOVO CAMPO: Setor
+    pub sector: Option<String>,
+    pub notes: Option<String>,                  // ✅ NOVO CAMPO: Setor
     pub nf_issue_date: Option<NaiveDate>,        // ✅ NOVO CAMPO: Data emissão NF
     pub supplier: Option<String>,                // ✅ NOVO CAMPO: Fornecedor
     pub is_vehicle: Option<bool>,                 // flag para veículos

@@ -31,6 +31,7 @@ export default function BulkPatrimonyForm({ onClose, onRefresh }: BulkPatrimonyF
     commitment_number: '',
     denf_se_number: '',
     sector: '',
+    notes: '',
     nf_issue_date: '',
     supplier: '',
     start_plate: '',
@@ -266,6 +267,7 @@ export default function BulkPatrimonyForm({ onClose, onRefresh }: BulkPatrimonyF
         commitment_number: formData.commitment_number.trim() || '',
         denf_se_number: formData.denf_se_number.trim() || '',
         sector: formData.sector.trim() || '',
+        notes: formData.notes.trim() || '',
         nf_issue_date: formData.nf_issue_date || null,
         supplier: formData.supplier.trim() || '',
         is_vehicle: formData.is_vehicle || false
@@ -694,6 +696,17 @@ export default function BulkPatrimonyForm({ onClose, onRefresh }: BulkPatrimonyF
                 placeholder="Ex: Almoxarifado, Sala 101"
               />
             </div>
+
+                <div style={styles.formGroup}>
+                  <label style={styles.formLabel}>Observações (Localização)</label>
+                  <textarea
+                    name="notes"
+                    value={formData.notes}
+                    onChange={handleInputChange}
+                    style={{ ...styles.formTextarea, minHeight: '60px' }}
+                    placeholder="Ex: Instalado na Sala do Vice-Prefeito"
+                  />
+                </div>
             <div style={styles.formGroup}>
               <label style={styles.formLabel}>Status</label>
               <select

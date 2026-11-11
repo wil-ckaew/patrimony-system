@@ -107,6 +107,7 @@ export default function BulkPatrimonyScreen({ navigation }) {
     department: '',
     status: 'active',
     sector: '',
+    notes: '',
     supplier: '',
     invoice_number: '',
     commitment_number: '',
@@ -126,6 +127,7 @@ export default function BulkPatrimonyScreen({ navigation }) {
       allowsEditing: true,
       aspect: [4, 3],
       quality: 0.8,
+      base64: true,
     });
     if (!result.canceled && result.assets && result.assets[0]) {
       setImage(result.assets[0].uri);
@@ -142,6 +144,7 @@ export default function BulkPatrimonyScreen({ navigation }) {
       allowsEditing: true,
       aspect: [4, 3],
       quality: 0.8,
+      base64: true,
     });
     if (!result.canceled && result.assets && result.assets[0]) {
       setImage(result.assets[0].uri);
@@ -193,28 +196,41 @@ export default function BulkPatrimonyScreen({ navigation }) {
     try {
       const fd = new FormData();
 
+      // Suporta tanto file:/// (nativo) quanto data:image/... (web)
       if (Platform.OS === 'web') {
         const blobResponse = await fetch(fileUri);
         const blob = await blobResponse.blob();
         const mimeType = blob.type || 'image/jpeg';
         const ext = mimeType.split('/')[1] || 'jpg';
-        fd.append('file', blob, `${endpointType}_${Date.now()}.${ext}`);
+        fd.append(endpointType === 'image' ? 'image' : 'file', blob, `${endpointType}_${Date.now()}.${ext}`);
       } else {
         const filename = fileUri.split('/').pop();
         let type = 'image/jpeg';
         const lower = filename.toLowerCase();
         if (lower.endsWith('.png')) type = 'image/png';
         if (lower.endsWith('.pdf')) type = 'application/pdf';
-        fd.append('file', { uri: fileUri, name: filename, type });
+        fd.append(endpointType === 'image' ? 'image' : 'file', { uri: fileUri, name: filename, type });
       }
 
-      const url = `${API_BASE_URL}/api/patrimony/fiscal-document/${patrimonyId}/${endpointType}`;
+      // Corrige a URL: 
+      // - Imagem do bem: /api/patrimony/{id}/image
+      // - Documentos fiscais: /api/fiscal-document/{id}/{tipo}
+      let url;
+      if (endpointType === 'image') {
+        url = `${API_BASE_URL}/api/patrimony/${patrimonyId}/image`;
+      } else {
+        url = `${API_BASE_URL}/api/fiscal-document/${patrimonyId}/${endpointType}`;
+      }
+
+      console.log(`[Bulk] 📡 POST ${url}`);
+
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: fd,
       });
 
+      console.log(`[Bulk] 📡 Status ${endpointType}:`, response.status);
       return response.ok;
     } catch (error) {
       console.error(`[Bulk] Erro upload ${endpointType}:`, error);
@@ -312,6 +328,7 @@ export default function BulkPatrimonyScreen({ navigation }) {
         department: formData.department,
         status: formData.status,
         sector: formData.sector.trim() || undefined,
+        notes: formData.notes.trim() || undefined,
         supplier: formData.supplier.trim() || undefined,
         invoice_number: formData.invoice_number.trim() || undefined,
         commitment_number: formData.commitment_number.trim() || undefined,
@@ -566,6 +583,17 @@ export default function BulkPatrimonyScreen({ navigation }) {
           value={formData.sector}
           onChangeText={(text) => setFormData({ ...formData, sector: text })}
           placeholder="Ex: Almoxarifado, Sala 101"
+          editable={!loading}
+        />
+
+        <Text style={styles.label}>Observações (Localização)</Text>
+        <TextInput
+          style={[styles.input, styles.textArea]}
+          value={formData.notes}
+          onChangeText={(text) => setFormData({ ...formData, notes: text })}
+          placeholder="Ex: Instalado na Sala do Vice-Prefeito"
+          multiline
+          numberOfLines={3}
           editable={!loading}
         />
 

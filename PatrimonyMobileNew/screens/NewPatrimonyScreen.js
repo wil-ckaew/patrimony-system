@@ -117,6 +117,7 @@ export default function NewPatrimonyScreen({ navigation }) {
     department: '',
     status: 'active',
     sector: '',
+    notes: '',
     supplier: '',
     invoice_number: '',
     commitment_number: '',
@@ -501,6 +502,7 @@ export default function NewPatrimonyScreen({ navigation }) {
         department: formData.department,
         status: formData.status,
         sector: formData.sector.trim() || undefined,
+        notes: formData.notes.trim() || undefined,
         supplier: formData.supplier.trim() || undefined,
         invoice_number: formData.invoice_number.trim() || undefined,
         commitment_number: formData.commitment_number.trim() || undefined,
@@ -829,6 +831,17 @@ export default function NewPatrimonyScreen({ navigation }) {
           value={formData.sector}
           onChangeText={(text) => setFormData({ ...formData, sector: text })}
           placeholder="Setor específico"
+          editable={!loading}
+        />
+
+        <Text style={styles.label}>Observações (Localização)</Text>
+        <TextInput
+          style={[styles.input, styles.textArea]}
+          value={formData.notes}
+          onChangeText={(text) => setFormData({ ...formData, notes: text })}
+          placeholder="Ex: Instalado na Sala do Vice-Prefeito"
+          multiline
+          numberOfLines={3}
           editable={!loading}
         />
 

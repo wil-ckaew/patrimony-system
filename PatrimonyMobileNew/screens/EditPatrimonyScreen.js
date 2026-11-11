@@ -119,6 +119,7 @@ export default function EditPatrimonyScreen({ route, navigation }) {
     department: patrimony.department || '',
     status: patrimony.status || 'active',
     sector: patrimony.sector || '',
+    notes: patrimony.notes || '',
     supplier: patrimony.supplier || '',
     invoice_number: patrimony.invoiceNumber || '',
     commitment_number: patrimony.commitmentNumber || '',
@@ -835,6 +836,17 @@ export default function EditPatrimonyScreen({ route, navigation }) {
           value={formData.sector}
           onChangeText={(text) => handleInputChange('sector', text)}
           placeholder="Setor do bem"
+          editable={!loading}
+        />
+
+        <Text style={styles.label}>Observações (Localização)</Text>
+        <TextInput
+          style={[styles.input, styles.textArea]}
+          value={formData.notes}
+          onChangeText={(text) => handleInputChange('notes', text)}
+          placeholder="Ex: Instalado na Sala do Vice-Prefeito"
+          multiline
+          numberOfLines={3}
           editable={!loading}
         />
 

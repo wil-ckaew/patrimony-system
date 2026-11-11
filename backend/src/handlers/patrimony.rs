@@ -1420,7 +1420,7 @@ pub async fn get_patrimonies(
             p.id, p.plate, p.name, p.description, p.acquisition_date, p.value, 
             p.department, p.status, p.invoice_number, p.commitment_number, 
             p.denf_se_number, p.invoice_file, p.commitment_file, p.denf_se_file, 
-            p.image_url, p.sector, p.nf_issue_date, p.supplier, p.is_vehicle, 
+            p.image_url, p.sector, p.notes, p.nf_issue_date, p.supplier, p.is_vehicle, 
             p.created_by, p.created_at, p.updated_at,
             f.fleet_number,
             f.notes as fleet_notes
@@ -1635,6 +1635,7 @@ pub async fn get_patrimonies(
             fiscal_documents: fiscal_documents_map.get(&patrimony_id).cloned(),
             image_url,
             sector: row.get("sector"),
+            notes: row.get("notes"),
             nf_issue_date: row.get("nf_issue_date"),
             supplier: row.get("supplier"),
             is_vehicle: row.get("is_vehicle"),
@@ -1672,7 +1673,7 @@ pub async fn get_patrimony(
             p.id, p.plate, p.name, p.description, p.acquisition_date, p.value, 
             p.department, p.status, p.invoice_number, p.commitment_number, 
             p.denf_se_number, p.invoice_file, p.commitment_file, p.denf_se_file, 
-            p.image_url, p.sector, p.nf_issue_date, p.supplier, p.is_vehicle, 
+            p.image_url, p.sector, p.notes, p.nf_issue_date, p.supplier, p.is_vehicle, 
             p.created_by, p.created_at, p.updated_at,
             f.fleet_number,
             f.notes as fleet_notes
@@ -1727,6 +1728,7 @@ pub async fn get_patrimony(
         fiscal_documents,
         image_url,
         sector: row.get("sector"),
+        notes: row.get("notes"),
         nf_issue_date: row.get("nf_issue_date"),
         supplier: row.get("supplier"),
         is_vehicle: row.get("is_vehicle"),
@@ -1851,6 +1853,7 @@ pub async fn create_patrimony(
                     fiscal_documents: None,
                     image_url,
                     sector: row.get("sector"),
+                    notes: row.get("notes"),
                     nf_issue_date: row.get("nf_issue_date"),
                     supplier: row.get("supplier"),
                     is_vehicle: row.get("is_vehicle"),
@@ -1971,14 +1974,15 @@ pub async fn update_patrimony(
     let nf_issue_date = patrimony.nf_issue_date.or(existing_nf_issue_date);
     let supplier = patrimony.supplier.clone().and_then(|s| normalize_optional_string(Some(s))).or(existing_supplier.clone());
     let is_vehicle = patrimony.is_vehicle.unwrap_or(existing_is_vehicle);
+    let notes = patrimony.notes.clone();
 
     let result = sqlx::query(
         "UPDATE patrimonies SET 
             plate = $1, name = $2, description = $3, acquisition_date = $4, value = $5, 
             department = $6, status = $7, invoice_number = $8, commitment_number = $9, 
             denf_se_number = $10, sector = $11, nf_issue_date = $12, supplier = $13, is_vehicle = $14, 
-            updated_at = NOW() 
-         WHERE id = $15"
+            notes = $15, updated_at = NOW() 
+         WHERE id = $16"
     )
     .bind(plate)
     .bind(name)
@@ -1994,7 +1998,8 @@ pub async fn update_patrimony(
     .bind(nf_issue_date)
     .bind(supplier)
     .bind(is_vehicle)
-    .bind(patrimony_id)
+    .bind(&notes)
+        .bind(patrimony_id)
     .execute(pool.get_ref())
     .await;
 
@@ -2024,7 +2029,7 @@ pub async fn update_patrimony(
                 let updated_patrimony = sqlx::query(
                     "SELECT id, plate, name, description, acquisition_date, value, department, status, 
                             invoice_number, commitment_number, denf_se_number, invoice_file, commitment_file, 
-                            denf_se_file, image_url, sector, nf_issue_date, supplier, is_vehicle, created_by, created_at, updated_at,
+                            denf_se_file, image_url, sector, notes, nf_issue_date, supplier, is_vehicle, created_by, created_at, updated_at,
                             (SELECT fleet_number FROM fleets WHERE patrimony_id = $1 LIMIT 1) as fleet_number,
                             (SELECT notes FROM fleets WHERE patrimony_id = $1 LIMIT 1) as fleet_notes
                      FROM patrimonies WHERE id = $1"
@@ -2051,6 +2056,7 @@ pub async fn update_patrimony(
                         fiscal_documents: None,
                         image_url,
                         sector: row.get("sector"),
+                        notes: row.get("notes"),
                         nf_issue_date: row.get("nf_issue_date"),
                         supplier: row.get("supplier"),
                         is_vehicle: row.get("is_vehicle"),
@@ -2358,6 +2364,7 @@ pub async fn get_patrimonies_by_department(
             fiscal_documents: None,
             image_url,
             sector: row.get("sector"),
+            notes: row.get("notes"),
             nf_issue_date: row.get("nf_issue_date"),
             supplier: row.get("supplier"),
             is_vehicle: row.get("is_vehicle"),
@@ -2484,7 +2491,7 @@ pub async fn get_fleet(
     };
 
     let result = sqlx::query(
-        "SELECT f.id, f.fleet_number, f.patrimony_id, p.plate AS patrimony_plate, p.name AS patrimony_name, f.department, f.notes, f.created_at, f.updated_at FROM fleets f LEFT JOIN patrimonies p ON p.id = f.patrimony_id ORDER BY f.created_at DESC"
+        "SELECT f.id, f.fleet_number, f.patrimony_id, p.plate AS patrimony_plate, p.name AS patrimony_name, f.department, f.fleet_notes, f.created_at, f.updated_at FROM fleets f LEFT JOIN patrimonies p ON p.id = f.patrimony_id ORDER BY f.created_at DESC"
     )
     .map(|row: PgRow| FleetItem {
         id: row.get("id"),
@@ -2493,7 +2500,7 @@ pub async fn get_fleet(
         patrimony_plate: row.get("patrimony_plate"),
         patrimony_name: row.get("patrimony_name"),
         department: row.get("department"),
-        notes: row.get("notes"),
+        notes: row.get("fleet_notes"),
         created_at: row.get("created_at"),
         updated_at: row.get("updated_at"),
     })
@@ -2522,7 +2529,7 @@ pub async fn get_fleet_item(
 
     let fleet_id = id.into_inner();
     let result = sqlx::query(
-        "SELECT f.id, f.fleet_number, f.patrimony_id, p.plate AS patrimony_plate, p.name AS patrimony_name, f.department, f.notes, f.created_at, f.updated_at FROM fleets f LEFT JOIN patrimonies p ON p.id = f.patrimony_id WHERE f.id = $1"
+        "SELECT f.id, f.fleet_number, f.patrimony_id, p.plate AS patrimony_plate, p.name AS patrimony_name, f.department, f.fleet_notes, f.created_at, f.updated_at FROM fleets f LEFT JOIN patrimonies p ON p.id = f.patrimony_id WHERE f.id = $1"
     )
     .bind(fleet_id)
     .map(|row: PgRow| FleetItem {
@@ -2532,7 +2539,7 @@ pub async fn get_fleet_item(
         patrimony_plate: row.get("patrimony_plate"),
         patrimony_name: row.get("patrimony_name"),
         department: row.get("department"),
-        notes: row.get("notes"),
+        notes: row.get("fleet_notes"),
         created_at: row.get("created_at"),
         updated_at: row.get("updated_at"),
     })
