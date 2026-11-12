@@ -1,0 +1,8 @@
+ALTER TABLE patrimonies ADD COLUMN IF NOT EXISTS invoice_file VARCHAR;
+ALTER TABLE patrimonies ADD COLUMN IF NOT EXISTS commitment_file VARCHAR;
+ALTER TABLE patrimonies ADD COLUMN IF NOT EXISTS denf_se_file VARCHAR;
+ALTER TABLE patrimonies ADD COLUMN IF NOT EXISTS image_url VARCHAR;
+
+ALTER TABLE fiscal_documents ADD COLUMN IF NOT EXISTS invoice_file VARCHAR;
+ALTER TABLE fiscal_documents ADD COLUMN IF NOT EXISTS commitment_file VARCHAR;
+ALTER TABLE fiscal_documents ADD COLUMN IF NOT EXISTS denf_se_file VARCHAR(500);
