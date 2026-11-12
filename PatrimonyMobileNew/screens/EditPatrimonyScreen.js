@@ -450,6 +450,7 @@ export default function EditPatrimonyScreen({ route, navigation }) {
         department: formData.department,
         status: formData.status,
         sector: formData.sector?.trim() || null,
+        notes: formData.notes?.trim() || null,
         supplier: formData.supplier?.trim() || null,
         invoice_number: formData.invoice_number?.trim() || null,
         commitment_number: formData.commitment_number?.trim() || null,

@@ -141,6 +141,7 @@ pub struct BulkPatrimonyRequest {
     pub nf_issue_date: Option<NaiveDate>,
     pub supplier: Option<String>,
     pub is_vehicle: bool,
+    pub notes: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -287,7 +288,8 @@ pub async fn create_bulk_patrimonies(
                 nf_issue_date,
                 supplier,
                 created_by,
-                is_vehicle
+                is_vehicle,
+                notes
             )
             VALUES (
                 $1,
@@ -305,7 +307,8 @@ pub async fn create_bulk_patrimonies(
                 $13,
                 $14,
                 $15,
-                $16
+                $16,
+                $17
             )
             ON CONFLICT (plate) DO NOTHING
             "#
@@ -326,6 +329,7 @@ pub async fn create_bulk_patrimonies(
         .bind(&supplier)
         .bind(user.id)
         .bind(bulk_data.is_vehicle)
+        .bind(&bulk_data.notes)
         .execute(pool.get_ref())
         .await;
 
@@ -839,9 +843,9 @@ async fn get_fiscal_documents(pool: &PgPool, patrimony_id: Uuid) -> Result<Vec<F
         patrimony_id: row.get("patrimony_id"),
         invoice_number: row.get("invoice_number"),
         commitment_number: row.get("commitment_number"),
-        invoice_file: row.get("invoice_file"),
-        commitment_file: row.get("commitment_file"),
-        denf_se_file: row.get("denf_se_file"),
+        invoice_file: row.try_get("invoice_file").unwrap_or(None),
+        commitment_file: row.try_get("commitment_file").unwrap_or(None),
+        denf_se_file: row.try_get("denf_se_file").unwrap_or(None),
         nf_issue_date: row.get("nf_issue_date"),
         supplier: row.get("supplier"),
         created_at: row.get("created_at"),
@@ -867,9 +871,9 @@ async fn get_fiscal_documents_for_patrimonies(pool: &PgPool, patrimony_ids: &[Uu
         patrimony_id: row.get("patrimony_id"),
         invoice_number: row.get("invoice_number"),
         commitment_number: row.get("commitment_number"),
-        invoice_file: row.get("invoice_file"),
-        commitment_file: row.get("commitment_file"),
-        denf_se_file: row.get("denf_se_file"),
+        invoice_file: row.try_get("invoice_file").unwrap_or(None),
+        commitment_file: row.try_get("commitment_file").unwrap_or(None),
+        denf_se_file: row.try_get("denf_se_file").unwrap_or(None),
         nf_issue_date: row.get("nf_issue_date"),
         supplier: row.get("supplier"),
         created_at: row.get("created_at"),
@@ -962,9 +966,9 @@ async fn maybe_migrate_legacy_documents(pool: &PgPool, patrimony_id: Uuid) -> Re
     if let Some(row) = row {
         let invoice_number: Option<String> = normalize_optional_string(row.get("invoice_number"));
         let commitment_number: Option<String> = normalize_optional_string(row.get("commitment_number"));
-        let invoice_file: Option<String> = normalize_optional_string(row.get("invoice_file"));
-        let commitment_file: Option<String> = normalize_optional_string(row.get("commitment_file"));
-        let denf_se_file: Option<String> = normalize_optional_string(row.get("denf_se_file"));
+        let invoice_file: Option<String> = normalize_optional_string(row.try_get("invoice_file").unwrap_or(None));
+        let commitment_file: Option<String> = normalize_optional_string(row.try_get("commitment_file").unwrap_or(None));
+        let denf_se_file: Option<String> = normalize_optional_string(row.try_get("denf_se_file").unwrap_or(None));
         let nf_issue_date: Option<NaiveDate> = row.get("nf_issue_date");
         let supplier: Option<String> = normalize_optional_string(row.get("supplier"));
 
@@ -1788,8 +1792,8 @@ pub async fn create_patrimony(
     let result = sqlx::query(
         "INSERT INTO patrimonies (id, plate, name, description, acquisition_date, value, 
                 department, status, invoice_number, commitment_number, denf_se_number, 
-                sector, nf_issue_date, supplier, is_vehicle, created_by) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) 
+                sector, nf_issue_date, supplier, is_vehicle, created_by, notes) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) 
          RETURNING id"
     )
     .bind(patrimony_id)
@@ -1808,6 +1812,7 @@ pub async fn create_patrimony(
     .bind(&supplier)
     .bind(patrimony.is_vehicle.unwrap_or(false))
     .bind(user.id)
+    .bind(&patrimony.notes)
     .map(|row: PgRow| row.get::<Uuid, _>("id"))
     .fetch_one(pool.get_ref())
     .await;
@@ -2163,7 +2168,7 @@ pub async fn debug_images(
             println!("✅ Encontradas {} imagens no banco", rows.len());
             
             let images: Vec<serde_json::Value> = rows.iter().map(|row: &PgRow| {
-                let image_url: Option<String> = row.get("image_url");
+                let image_url: Option<String> = row.try_get("image_url").unwrap_or(None);
                 println!("📋 Patrimônio: {} - URL: {:?}", row.get::<String, _>("plate"), image_url);
                 
                 serde_json::json!({

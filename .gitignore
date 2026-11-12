@@ -227,3 +227,9 @@ frontend/components/*.bkp-*
 frontend/pages/*_copia*
 frontend/types/*.bkp-*
 PatrimonyMobileNew/.npmrc.save
+backup_*.sql
+*.bkp-*
+
+# === Migrations (devem ser versionadas) ===
+!backend/migrations/
+!backend/migrations/*.sql
