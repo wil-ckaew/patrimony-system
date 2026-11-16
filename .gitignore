@@ -233,3 +233,4 @@ backup_*.sql
 # === Migrations (devem ser versionadas) ===
 !backend/migrations/
 !backend/migrations/*.sql
+Dockerfile.bkp*

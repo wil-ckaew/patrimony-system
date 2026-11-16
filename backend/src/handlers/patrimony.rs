@@ -2496,7 +2496,7 @@ pub async fn get_fleet(
     };
 
     let result = sqlx::query(
-        "SELECT f.id, f.fleet_number, f.patrimony_id, p.plate AS patrimony_plate, p.name AS patrimony_name, f.department, f.fleet_notes, f.created_at, f.updated_at FROM fleets f LEFT JOIN patrimonies p ON p.id = f.patrimony_id ORDER BY f.created_at DESC"
+        "SELECT f.id, f.fleet_number, f.patrimony_id, p.plate AS patrimony_plate, p.name AS patrimony_name, f.department, f.notes as fleet_notes, f.created_at, f.updated_at FROM fleets f LEFT JOIN patrimonies p ON p.id = f.patrimony_id ORDER BY f.created_at DESC"
     )
     .map(|row: PgRow| FleetItem {
         id: row.get("id"),
@@ -2534,7 +2534,7 @@ pub async fn get_fleet_item(
 
     let fleet_id = id.into_inner();
     let result = sqlx::query(
-        "SELECT f.id, f.fleet_number, f.patrimony_id, p.plate AS patrimony_plate, p.name AS patrimony_name, f.department, f.fleet_notes, f.created_at, f.updated_at FROM fleets f LEFT JOIN patrimonies p ON p.id = f.patrimony_id WHERE f.id = $1"
+        "SELECT f.id, f.fleet_number, f.patrimony_id, p.plate AS patrimony_plate, p.name AS patrimony_name, f.department, f.notes as fleet_notes, f.created_at, f.updated_at FROM fleets f LEFT JOIN patrimonies p ON p.id = f.patrimony_id WHERE f.id = $1"
     )
     .bind(fleet_id)
     .map(|row: PgRow| FleetItem {

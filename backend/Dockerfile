@@ -1,4 +1,4 @@
-FROM rust:slim-bookworm AS builder
+FROM rust:1.89-slim-bookworm AS builder
 
 # Instala dependências SSL e outras necessárias
 RUN apt-get update && apt-get install -y \
