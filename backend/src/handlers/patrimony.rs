@@ -422,7 +422,7 @@ pub async fn upload_fiscal_document_invoice(
         Err(e) => return e,
     };
 
-    let fiscal_doc_id = id.into_inner();
+    let patrimony_id = id.into_inner();
     
     while let Ok(Some(mut field)) = payload.try_next().await {
         let filename = field.content_disposition().get_filename().unwrap_or("document.pdf").to_string();
@@ -435,7 +435,7 @@ pub async fn upload_fiscal_document_invoice(
         }
 
         let file_extension = Path::new(&filename).extension().and_then(|ext| ext.to_str()).unwrap_or("pdf");
-        let new_filename = format!("fiscal_invoice_{}_{}.{}", fiscal_doc_id, Uuid::new_v4(), file_extension);
+        let new_filename = format!("fiscal_invoice_{}_{}.{}", patrimony_id, Uuid::new_v4(), file_extension);
         let filepath = format!("{}/{}", docs_dir, new_filename);
 
         let mut file = match File::create(&filepath).await {
@@ -451,17 +451,34 @@ pub async fn upload_fiscal_document_invoice(
 
         let document_url = format!("/documents/{}", new_filename);
         
-        let result = sqlx::query("UPDATE fiscal_documents SET invoice_file = $1 WHERE id = $2")
+        // Tenta UPDATE pelo patrimony_id; se não existir registro, faz INSERT
+        let update_result = sqlx::query("UPDATE fiscal_documents SET invoice_file = $1 WHERE patrimony_id = $2")
             .bind(&document_url)
-            .bind(fiscal_doc_id)
+            .bind(patrimony_id)
             .execute(pool.get_ref())
             .await;
 
-        match result {
-            Ok(_) => return HttpResponse::Ok().json(serde_json::json!({
-                "message": "Arquivo enviado com sucesso",
-                "file_url": document_url
-            })),
+        match update_result {
+            Ok(res) => {
+                if res.rows_affected() == 0 {
+                    // Não existe documento fiscal ainda — cria um
+                    let insert_result = sqlx::query(
+                        "INSERT INTO fiscal_documents (id, patrimony_id, invoice_file) VALUES ($1, $2, $3)"
+                    )
+                    .bind(Uuid::new_v4())
+                    .bind(patrimony_id)
+                    .bind(&document_url)
+                    .execute(pool.get_ref())
+                    .await;
+                    if insert_result.is_err() {
+                        return HttpResponse::InternalServerError().json("Erro ao criar documento fiscal");
+                    }
+                }
+                return HttpResponse::Ok().json(serde_json::json!({
+                    "message": "Arquivo enviado com sucesso",
+                    "file_url": document_url
+                }));
+            },
             Err(_e) => return HttpResponse::InternalServerError().json("Erro ao atualizar documento"),
         }
     }
@@ -482,7 +499,7 @@ pub async fn upload_fiscal_document_commitment(
         Err(e) => return e,
     };
 
-    let fiscal_doc_id = id.into_inner();
+    let patrimony_id = id.into_inner();
     
     while let Ok(Some(mut field)) = payload.try_next().await {
         let filename = field.content_disposition().get_filename().unwrap_or("document.pdf").to_string();
@@ -495,7 +512,7 @@ pub async fn upload_fiscal_document_commitment(
         }
 
         let file_extension = Path::new(&filename).extension().and_then(|ext| ext.to_str()).unwrap_or("pdf");
-        let new_filename = format!("fiscal_commitment_{}_{}.{}", fiscal_doc_id, Uuid::new_v4(), file_extension);
+        let new_filename = format!("fiscal_commitment_{}_{}.{}", patrimony_id, Uuid::new_v4(), file_extension);
         let filepath = format!("{}/{}", docs_dir, new_filename);
 
         let mut file = match File::create(&filepath).await {
@@ -511,17 +528,34 @@ pub async fn upload_fiscal_document_commitment(
 
         let document_url = format!("/documents/{}", new_filename);
         
-        let result = sqlx::query("UPDATE fiscal_documents SET commitment_file = $1 WHERE id = $2")
+        // Tenta UPDATE pelo patrimony_id; se não existir registro, faz INSERT
+        let update_result = sqlx::query("UPDATE fiscal_documents SET commitment_file = $1 WHERE patrimony_id = $2")
             .bind(&document_url)
-            .bind(fiscal_doc_id)
+            .bind(patrimony_id)
             .execute(pool.get_ref())
             .await;
 
-        match result {
-            Ok(_) => return HttpResponse::Ok().json(serde_json::json!({
-                "message": "Arquivo enviado com sucesso",
-                "file_url": document_url
-            })),
+        match update_result {
+            Ok(res) => {
+                if res.rows_affected() == 0 {
+                    // Não existe documento fiscal ainda — cria um
+                    let insert_result = sqlx::query(
+                        "INSERT INTO fiscal_documents (id, patrimony_id, commitment_file) VALUES ($1, $2, $3)"
+                    )
+                    .bind(Uuid::new_v4())
+                    .bind(patrimony_id)
+                    .bind(&document_url)
+                    .execute(pool.get_ref())
+                    .await;
+                    if insert_result.is_err() {
+                        return HttpResponse::InternalServerError().json("Erro ao criar documento fiscal");
+                    }
+                }
+                return HttpResponse::Ok().json(serde_json::json!({
+                    "message": "Arquivo enviado com sucesso",
+                    "file_url": document_url
+                }));
+            },
             Err(_e) => return HttpResponse::InternalServerError().json("Erro ao atualizar documento"),
         }
     }
@@ -542,7 +576,7 @@ pub async fn upload_fiscal_document_denf(
         Err(e) => return e,
     };
 
-    let fiscal_doc_id = id.into_inner();
+    let patrimony_id = id.into_inner();
     
     while let Ok(Some(mut field)) = payload.try_next().await {
         let filename = field.content_disposition().get_filename().unwrap_or("document.pdf").to_string();
@@ -555,7 +589,7 @@ pub async fn upload_fiscal_document_denf(
         }
 
         let file_extension = Path::new(&filename).extension().and_then(|ext| ext.to_str()).unwrap_or("pdf");
-        let new_filename = format!("fiscal_denf_{}_{}.{}", fiscal_doc_id, Uuid::new_v4(), file_extension);
+        let new_filename = format!("fiscal_denf_{}_{}.{}", patrimony_id, Uuid::new_v4(), file_extension);
         let filepath = format!("{}/{}", docs_dir, new_filename);
 
         let mut file = match File::create(&filepath).await {
@@ -571,17 +605,34 @@ pub async fn upload_fiscal_document_denf(
 
         let document_url = format!("/documents/{}", new_filename);
         
-        let result = sqlx::query("UPDATE fiscal_documents SET denf_se_file = $1 WHERE id = $2")
+        // Tenta UPDATE pelo patrimony_id; se não existir registro, faz INSERT
+        let update_result = sqlx::query("UPDATE fiscal_documents SET denf_se_file = $1 WHERE patrimony_id = $2")
             .bind(&document_url)
-            .bind(fiscal_doc_id)
+            .bind(patrimony_id)
             .execute(pool.get_ref())
             .await;
 
-        match result {
-            Ok(_) => return HttpResponse::Ok().json(serde_json::json!({
-                "message": "Arquivo enviado com sucesso",
-                "file_url": document_url
-            })),
+        match update_result {
+            Ok(res) => {
+                if res.rows_affected() == 0 {
+                    // Não existe documento fiscal ainda — cria um
+                    let insert_result = sqlx::query(
+                        "INSERT INTO fiscal_documents (id, patrimony_id, denf_se_file) VALUES ($1, $2, $3)"
+                    )
+                    .bind(Uuid::new_v4())
+                    .bind(patrimony_id)
+                    .bind(&document_url)
+                    .execute(pool.get_ref())
+                    .await;
+                    if insert_result.is_err() {
+                        return HttpResponse::InternalServerError().json("Erro ao criar documento fiscal");
+                    }
+                }
+                return HttpResponse::Ok().json(serde_json::json!({
+                    "message": "Arquivo enviado com sucesso",
+                    "file_url": document_url
+                }));
+            },
             Err(_e) => return HttpResponse::InternalServerError().json("Erro ao atualizar documento"),
         }
     }
@@ -1831,7 +1882,7 @@ pub async fn create_patrimony(
             let new_patrimony = sqlx::query(
                 "SELECT id, plate, name, description, acquisition_date, value, department, status, 
                         invoice_number, commitment_number, denf_se_number, invoice_file, commitment_file, 
-                        denf_se_file, image_url, sector, nf_issue_date, supplier, is_vehicle, created_by, created_at, updated_at,
+                        denf_se_file, image_url, sector, notes, nf_issue_date, supplier, is_vehicle, created_by, created_at, updated_at,
                         (SELECT fleet_number FROM fleets WHERE patrimony_id = $1 LIMIT 1) as fleet_number,
                         (SELECT notes FROM fleets WHERE patrimony_id = $1 LIMIT 1) as fleet_notes
                  FROM patrimonies WHERE id = $1"

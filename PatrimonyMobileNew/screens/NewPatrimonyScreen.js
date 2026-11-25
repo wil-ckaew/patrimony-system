@@ -175,7 +175,7 @@ export default function NewPatrimonyScreen({ navigation }) {
       if (!result.canceled && result.assets && result.assets[0]) {
         console.log('[New] 📷 Foto capturada:', result.assets[0].uri);
         const asset = result.assets[0];
-        setImage(asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri);
+        setImage(asset.uri);
       }
     } catch (error) {
       console.error('[New] ❌ takePicture erro:', error);
@@ -195,7 +195,7 @@ export default function NewPatrimonyScreen({ navigation }) {
       });
       if (!result.canceled && result.assets && result.assets[0]) {
         const asset = result.assets[0];
-        setImage(asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri);
+        setImage(asset.uri);
       }
     } catch (error) {
       showAlert('Erro', 'Não foi possível selecionar a imagem');
@@ -213,11 +213,11 @@ export default function NewPatrimonyScreen({ navigation }) {
         mediaTypes: ['images'],
         allowsEditing: false,
         quality: 0.9,
-        base64: true,
+        base64: false,
       });
       if (!result.canceled && result.assets && result.assets[0]) {
         const asset = result.assets[0];
-        setter(asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri);
+        setter(asset.uri);
         console.log(`[New] 📎 ${label} selecionado:`, asset.base64 ? 'base64' : asset.uri);
       }
     } catch (error) {
@@ -281,6 +281,12 @@ export default function NewPatrimonyScreen({ navigation }) {
     console.log('[New] 📷 patrimonyId:', patrimonyId);
     console.log('[New] 📷 imageUri:', imageUri);
     console.log('[New] 📷 Platform:', Platform.OS);
+    console.log('[New] 📷 token existe?', !!token);
+
+    if (!token) {
+      console.error('[New] ❌ token vazio — upload foto abortado');
+      return { ok: false, status: 0, reason: 'token vazio' };
+    }
 
     try {
       const fd = new FormData();
@@ -303,39 +309,34 @@ export default function NewPatrimonyScreen({ navigation }) {
         if (lower.endsWith('.png')) type = 'image/png';
         if (lower.endsWith('.gif')) type = 'image/gif';
         if (lower.endsWith('.heic')) type = 'image/heic';
-        fd.append('image', {
-          uri: imageUri,
-          name: uniqueFilename,
-          type,
-        });
+        fd.append('image', { uri: imageUri, name: uniqueFilename, type });
         console.log('[New] 📱 Campo "image":', uniqueFilename, type);
       }
 
       const url = `${API_BASE_URL}/api/patrimony/${patrimonyId}/image`;
       console.log('[New] 📡 POST', url);
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-        body: fd,
-      });
-
-      console.log('[New] 📡 Status:', response.status);
-
-      if (response.ok) {
-        const responseText = await response.text();
-        console.log('[New] ✅ Foto enviada:', responseText.substring(0, 200));
-        return true;
-      } else {
-        const errorText = await response.text();
-        console.log('[New] ❌ Erro foto:', response.status, errorText);
-        return false;
+      let response;
+      try {
+        response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+          body: fd,
+        });
+      } catch (fetchErr) {
+        console.error('[New] ❌ FETCH lançou:', fetchErr?.message || fetchErr);
+        return { ok: false, status: -1, reason: String(fetchErr?.message || fetchErr) };
       }
+
+      let bodyText = '';
+      try { bodyText = await response.text(); } catch (_) {}
+
+      console.log('[New] 📡 Status:', response.status, '| body:', bodyText.slice(0, 200));
+
+      return { ok: response.ok, status: response.status, reason: bodyText.slice(0, 200) };
     } catch (error) {
-      console.error('[New] ❌ Exception upload foto:', error);
-      return false;
+      console.error('[New] ❌ Exception upload foto:', error?.message || error);
+      return { ok: false, status: -2, reason: String(error?.message || error) };
     }
   };
 
@@ -369,11 +370,11 @@ export default function NewPatrimonyScreen({ navigation }) {
               const result = await ImagePicker.launchCameraAsync({
                 mediaTypes: ['images'],
                 quality: 0.8,
-                base64: true,
+                base64: false,
               });
               if (!result.canceled && result.assets && result.assets[0]) {
                 const asset = result.assets[0];
-                setter(asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri);
+                setter(asset.uri);
               }
             } catch (e) {
               showAlert('Erro', 'Não foi possível tirar a foto');
@@ -395,11 +396,11 @@ export default function NewPatrimonyScreen({ navigation }) {
               const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ['images'],
                 quality: 0.8,
-                base64: true,
+                base64: false,
               });
               if (!result.canceled && result.assets && result.assets[0]) {
                 const asset = result.assets[0];
-                setter(asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri);
+                setter(asset.uri);
               }
             } catch (e) {
               showAlert('Erro', 'Não foi possível abrir a galeria');
@@ -424,6 +425,12 @@ export default function NewPatrimonyScreen({ navigation }) {
   // ============================================================
   const uploadFiscalDocument = async (patrimonyId, fileUri, docType) => {
     console.log(`[New] 📎 ================== UPLOAD ${docType.toUpperCase()} ==================`);
+    console.log(`[New] 📎 token existe?`, !!token);
+
+    if (!token) {
+      console.error(`[New] ❌ token vazio — upload ${docType} abortado`);
+      return false;
+    }
 
     try {
       const fd = new FormData();
@@ -458,14 +465,16 @@ export default function NewPatrimonyScreen({ navigation }) {
         body: fd,
       });
 
-      console.log(`[New] 📡 Status ${docType}:`, response.status);
+      let bodyText = '';
+      try { bodyText = await response.text(); } catch (_) {}
+
+      console.log(`[New] 📡 Status ${docType}:`, response.status, '| body:', bodyText.slice(0, 200));
 
       if (response.ok) {
         console.log(`[New] ✅ ${docType} enviado`);
         return true;
       } else {
-        const errorText = await response.text();
-        console.log(`[New] ❌ Erro ${docType}:`, response.status, errorText);
+        console.log(`[New] ❌ Erro ${docType}:`, response.status, bodyText.slice(0, 300));
         return false;
       }
     } catch (error) {
@@ -492,6 +501,10 @@ export default function NewPatrimonyScreen({ navigation }) {
 
     setLoading(true);
 
+    let patrimonyId = null;
+    let createdOk = false;
+
+    // ===== PASSO 1: criar o bem (com try/catch próprio) =====
     try {
       const payload = {
         plate: formData.plate.trim(),
@@ -510,100 +523,138 @@ export default function NewPatrimonyScreen({ navigation }) {
         nf_issue_date: formData.nf_issue_date || undefined,
       };
 
-      console.log('[New] 🌐 POST', `${API_BASE_URL}/api/patrimony`);
-      console.log('[New] 📤 payload:', JSON.stringify(payload));
+      console.log('[New] 🌐 [PASSO 1] POST', `${API_BASE_URL}/api/patrimony`);
+      console.log('[New] 📤 [PASSO 1] payload:', JSON.stringify(payload));
 
-      const response = await fetch(`${API_BASE_URL}/api/patrimony`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-
-      console.log('[New] 📡 status:', response.status);
-
-      if (response.ok) {
-        const responseData = await response.json();
-        console.log('[New] ✅ Bem criado:', responseData);
-
-        const patrimonyId = responseData.id;
-
-        if (patrimonyId) {
-          // 1. Upload da FOTO DO BEM
-          if (image) {
-            console.log('[New] 🖼️ Enviando FOTO DO BEM...');
-            await uploadImageToPatrimony(patrimonyId, image);
-          }
-
-          // 2. Criar o DOCUMENTO FISCAL (se tiver pelo menos um anexo)
-          if (invoiceFile || commitmentFile || denfFile) {
-            console.log('[New] 📋 Criando fiscal_document...');
-            try {
-              const fiscalResp = await fetch(`${API_BASE_URL}/api/patrimony/${patrimonyId}/fiscal-document`, {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${token}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  invoice_number: formData.invoice_number.trim() || null,
-                  commitment_number: formData.commitment_number.trim() || null,
-                  denf_se_number: formData.denf_se_number.trim() || null,
-                  nf_issue_date: formData.nf_issue_date || null,
-                }),
-              });
-
-              console.log('[New] 📡 fiscal_document status:', fiscalResp.status);
-
-              if (fiscalResp.ok) {
-                const fiscalDoc = await fiscalResp.json();
-                const fiscalDocId = fiscalDoc.id;
-                console.log('[New] ✅ fiscal_document criado:', fiscalDocId);
-
-                if (invoiceFile) {
-                  console.log('[New] 📄 Enviando NF...');
-                  await uploadFiscalDocument(fiscalDocId, invoiceFile, 'invoice');
-                }
-                if (commitmentFile) {
-                  console.log('[New] 📑 Enviando Empenho...');
-                  await uploadFiscalDocument(fiscalDocId, commitmentFile, 'commitment');
-                }
-                if (denfFile) {
-                  console.log('[New] 📋 Enviando DENF/SE...');
-                  await uploadFiscalDocument(fiscalDocId, denfFile, 'denf');
-                }
-              } else {
-                const errText = await fiscalResp.text();
-                console.log('[New] ❌ Erro ao criar fiscal_document:', errText);
-              }
-            } catch (e) {
-              console.log('[New] ❌ Exception fiscal_document:', e);
-            }
-          }
-        }
-
-        // Mostrar o alerta (sem callback)
-        showAlert('Sucesso', 'Bem cadastrado com sucesso!');
-
-        // Voltar para a lista (fora do callback)
-        try {
-          navigation.goBack();
-        } catch (e) {
-          navigation.navigate('Patrimonies');
-        }
-      } else {
-        const errorText = await response.text();
-        console.log('[New] ❌ Erro do servidor:', errorText);
-        showAlert('Erro', errorText || 'Erro ao cadastrar bem');
+      let response;
+      try {
+        response = await fetch(`${API_BASE_URL}/api/patrimony`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        });
+      } catch (fetchErr) {
+        console.error('[New] ❌ [PASSO 1] FETCH lançou:', fetchErr?.message || fetchErr);
+        console.error('[New] ❌ [PASSO 1] FETCH stack:', fetchErr?.stack);
+        showAlert('Erro', `Falha de rede ao criar bem: ${fetchErr?.message || fetchErr}`);
+        setLoading(false);
+        return;
       }
+
+      console.log('[New] 📡 [PASSO 1] status:', response.status);
+      console.log('[New] 📡 [PASSO 1] content-type:', response.headers.get('content-type'));
+
+      // Ler body SEM assumir que é string
+      let rawBody = '';
+      try {
+        const text = await response.text();
+        rawBody = (typeof text === 'string') ? text : String(text || '');
+      } catch (readErr) {
+        console.error('[New] ❌ [PASSO 1] Erro ao ler body:', readErr?.message || readErr);
+        rawBody = '';
+      }
+      console.log('[New] 📡 [PASSO 1] body bruto (len=' + rawBody.length + '):', rawBody.slice(0, 500));
+
+      if (!response.ok) {
+        console.log('[New] ❌ [PASSO 1] Servidor retornou erro:', rawBody);
+        showAlert('Erro', rawBody || `Erro ${response.status} ao cadastrar bem`);
+        setLoading(false);
+        return;
+      }
+
+      // Parse seguro
+      let responseData = null;
+      try {
+        responseData = rawBody ? JSON.parse(rawBody) : null;
+      } catch (parseErr) {
+        console.error('[New] ❌ [PASSO 1] JSON.parse falhou:', parseErr?.message);
+        console.error('[New] ❌ [PASSO 1] Body recebido:', rawBody);
+        showAlert('Erro', `Servidor respondeu algo inesperado (${rawBody.slice(0, 80)})`);
+        setLoading(false);
+        return;
+      }
+
+      console.log('[New] ✅ [PASSO 1] Bem criado:', responseData);
+      patrimonyId = responseData?.id || null;
+      createdOk = true;
+
     } catch (error) {
-      console.error('[New] ❌ Exception:', error);
-      showAlert('Erro', 'Erro de conexão. Verifique se o servidor está rodando.');
-    } finally {
+      console.error('[New] ❌ [PASSO 1 — catch externo] Exception:', error?.message || error);
+      console.error('[New] ❌ [PASSO 1 — catch externo] Stack:', error?.stack);
+      showAlert('Erro', `Falha inesperada: ${error?.message || error}`);
       setLoading(false);
+      return;
     }
+
+    if (!patrimonyId) {
+      console.warn('[New] ⚠️ Bem criado mas sem id:', patrimonyId);
+      showAlert('Erro', 'Bem criado mas servidor não retornou id.');
+      setLoading(false);
+      return;
+    }
+
+    // ===== PASSO 2: uploads (cada um com try/catch próprio) =====
+    const failures = [];
+
+    const safeUpload = async (label, fn) => {
+      try {
+        console.log(`[New] ▶️ [PASSO 2] Iniciando upload: ${label}`);
+        const result = await fn();
+        console.log(`[New] ◀️ [PASSO 2] Resultado upload ${label}:`, result);
+        // Aceita tanto `true` (retorno antigo) quanto `{ok: true}` (novo)
+        if (result === true) return true;
+        if (result && typeof result === 'object' && result.ok === true) return true;
+        return false;
+      } catch (e) {
+        console.error(`[New] 💥 [PASSO 2] EXCEÇÃO no upload ${label}:`, e?.message || e, e?.stack);
+        return false;
+      }
+    };
+
+    if (image) {
+      const ok = await safeUpload('foto do bem', () => uploadImageToPatrimony(patrimonyId, image));
+      if (!ok) failures.push('foto do bem');
+    }
+    if (invoiceFile) {
+      const ok = await safeUpload('NF', () => uploadFiscalDocument(patrimonyId, invoiceFile, 'invoice'));
+      if (!ok) failures.push('NF');
+    }
+    if (commitmentFile) {
+      const ok = await safeUpload('Empenho', () => uploadFiscalDocument(patrimonyId, commitmentFile, 'commitment'));
+      if (!ok) failures.push('Empenho');
+    }
+    if (denfFile) {
+      const ok = await safeUpload('DENF/SE', () => uploadFiscalDocument(patrimonyId, denfFile, 'denf'));
+      if (!ok) failures.push('DENF/SE');
+    }
+
+    console.log('[New] 🏁 [PASSO 2] Uploads concluídos. Falhas:', failures);
+
+    // ===== PASSO 3: alertas e navegação (com try/catch) =====
+    try {
+      if (failures.length > 0) {
+        showAlert('Aviso', `Bem cadastrado, mas falharam: ${failures.join(', ')}`);
+      } else {
+        showAlert('Sucesso', 'Bem cadastrado com sucesso!');
+      }
+    } catch (e) {
+      console.error('[New] ⚠️ [PASSO 3] Erro ao mostrar alerta:', e?.message || e);
+    }
+
+    try {
+      navigation.goBack();
+    } catch (e) {
+      try {
+        navigation.navigate('Patrimonies');
+      } catch (e2) {
+        console.error('[New] ⚠️ [PASSO 3] Erro ao navegar:', e2?.message || e2);
+      }
+    }
+
+    setLoading(false);
   };
 
   const removeImage = () => setImage(null);

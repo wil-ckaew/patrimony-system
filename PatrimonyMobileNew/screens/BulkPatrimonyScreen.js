@@ -127,7 +127,7 @@ export default function BulkPatrimonyScreen({ navigation }) {
       allowsEditing: true,
       aspect: [4, 3],
       quality: 0.8,
-      base64: true,
+      base64: false,
     });
     if (!result.canceled && result.assets && result.assets[0]) {
       setImage(result.assets[0].uri);
@@ -144,7 +144,7 @@ export default function BulkPatrimonyScreen({ navigation }) {
       allowsEditing: true,
       aspect: [4, 3],
       quality: 0.8,
-      base64: true,
+      base64: false,
     });
     if (!result.canceled && result.assets && result.assets[0]) {
       setImage(result.assets[0].uri);
@@ -194,6 +194,11 @@ export default function BulkPatrimonyScreen({ navigation }) {
   // ============================================================
   const uploadFile = async (patrimonyId, fileUri, endpointType) => {
     try {
+      if (!token) {
+        console.error(`[Bulk] ❌ token vazio — upload ${endpointType} abortado`);
+        return { ok: false, status: 0, reason: 'token vazio' };
+      }
+
       const fd = new FormData();
 
       // Suporta tanto file:/// (nativo) quanto data:image/... (web)
@@ -212,9 +217,6 @@ export default function BulkPatrimonyScreen({ navigation }) {
         fd.append(endpointType === 'image' ? 'image' : 'file', { uri: fileUri, name: filename, type });
       }
 
-      // Corrige a URL: 
-      // - Imagem do bem: /api/patrimony/{id}/image
-      // - Documentos fiscais: /api/fiscal-document/{id}/{tipo}
       let url;
       if (endpointType === 'image') {
         url = `${API_BASE_URL}/api/patrimony/${patrimonyId}/image`;
@@ -230,11 +232,18 @@ export default function BulkPatrimonyScreen({ navigation }) {
         body: fd,
       });
 
-      console.log(`[Bulk] 📡 Status ${endpointType}:`, response.status);
-      return response.ok;
+      let bodyText = '';
+      try { bodyText = await response.text(); } catch (_) {}
+
+      console.log(`[Bulk] 📡 Status ${endpointType}:`, response.status, '| body:', bodyText.slice(0, 200));
+
+      if (!response.ok) {
+        console.error(`[Bulk] ❌ Upload ${endpointType} falhou (${response.status}):`, bodyText.slice(0, 300));
+      }
+      return { ok: response.ok, status: response.status, reason: bodyText.slice(0, 200) };
     } catch (error) {
-      console.error(`[Bulk] Erro upload ${endpointType}:`, error);
-      return false;
+      console.error(`[Bulk] ❌ Erro upload ${endpointType}:`, error?.message || error);
+      return { ok: false, status: -1, reason: String(error?.message || error) };
     }
   };
 
@@ -247,9 +256,26 @@ export default function BulkPatrimonyScreen({ navigation }) {
       if (denfFile) uploadPromises.push(uploadFile(patrimonyId, denfFile, 'denf'));
     }
     const results = await Promise.allSettled(uploadPromises);
-    const successCount = results.filter(r => r.status === 'fulfilled' && r.value === true).length;
-    const failCount = results.filter(r => r.status === 'rejected' || r.value === false).length;
-    return { successCount, failCount, total: uploadPromises.length };
+
+    const failures = [];
+    let successCount = 0;
+    results.forEach((r) => {
+      if (r.status === 'fulfilled' && r.value && r.value.ok) {
+        successCount++;
+      } else {
+        const reason = r.status === 'fulfilled' ? (r.value?.reason || `status ${r.value?.status}`) : String(r.reason);
+        failures.push(reason);
+      }
+    });
+
+    const failCount = failures.length;
+    const total = uploadPromises.length;
+
+    if (failures.length > 0) {
+      console.error('[Bulk] ❌ Falhas de upload:', failures);
+    }
+
+    return { successCount, failCount, total, failures };
   };
 
   // ============================================================
@@ -353,10 +379,14 @@ export default function BulkPatrimonyScreen({ navigation }) {
 
       if (response.ok && data.inserted > 0 && data.inserted_ids && data.inserted_ids.length > 0) {
         if (image || invoiceFile || commitmentFile || denfFile) {
-          const { successCount, failCount, total } = await uploadFilesToAllPatrimonies(data.inserted_ids);
+          const { successCount, failCount, total, failures } = await uploadFilesToAllPatrimonies(data.inserted_ids);
           console.log(`[Bulk] ✅ Uploads: ${successCount}/${total}`);
           if (failCount > 0) {
-            showAlert('Aviso', `${successCount} uploads OK, ${failCount} falharam.`);
+            const preview = (failures || []).slice(0, 3).join(' | ');
+            showAlert('Aviso', `${successCount}/${total} uploads OK.
+${failCount} falharam.
+
+Detalhe: ${preview || 'sem detalhe'}`);
           }
         }
 
@@ -543,6 +573,15 @@ export default function BulkPatrimonyScreen({ navigation }) {
           placeholder="Selecionar data"
         />
 
+        <Text style={styles.label}>Data Emissão NF (Opcional)</Text>
+        <DateInput
+          label="Data emissão NF (Opcional)"
+          value={formData.nf_issue_date}
+          onChange={(v) => handleDateChange('nf_issue_date', v)}
+          disabled={loading}
+          placeholder="Selecionar data"
+        />
+
         <Text style={styles.label}>Departamento *</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.departmentScroll}>
           {departments.map(dept => (
@@ -624,13 +663,13 @@ export default function BulkPatrimonyScreen({ navigation }) {
           editable={!loading}
         />
 
-        <Text style={styles.label}>Data Emissão NF (Opcional)</Text>
-        <DateInput
-          label="Data emissão NF (Opcional)"
-          value={formData.nf_issue_date}
-          onChange={(v) => handleDateChange('nf_issue_date', v)}
-          disabled={loading}
-          placeholder="Selecionar data"
+        <Text style={styles.label}>N° DENF/SE (Opcional)</Text>
+        <TextInput
+          style={styles.input}
+          value={formData.denf_se_number}
+          onChangeText={(text) => setFormData({ ...formData, denf_se_number: text })}
+          placeholder="Número do DENF/SE"
+          editable={!loading}
         />
 
         <TouchableOpacity
