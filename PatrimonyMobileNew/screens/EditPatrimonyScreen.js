@@ -12,7 +12,8 @@ import {
   Image,
   Platform,
   Keyboard,
-  Linking
+  Linking,
+  Switch,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -124,6 +125,7 @@ export default function EditPatrimonyScreen({ route, navigation }) {
     invoice_number: patrimony.invoiceNumber || '',
     commitment_number: patrimony.commitmentNumber || '',
     denf_se_number: patrimony.denfSeNumber || '',
+    is_vehicle: patrimony.isVehicle || false,
     nf_issue_date: patrimony.nfIssueDate || '',
   });
 
@@ -212,12 +214,12 @@ export default function EditPatrimonyScreen({ route, navigation }) {
         mediaTypes: ['images'],
         allowsEditing: false,
         quality: 0.9,
-        base64: true,
+        base64: false,   // ← CORRIGIDO: usar uri nativo (file://) para upload mobile
       });
       if (!result.canceled && result.assets && result.assets[0]) {
         const asset = result.assets[0];
-        setter(asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri);
-        console.log(`[Edit] 📎 ${label} selecionado:`, asset.base64 ? 'base64' : asset.uri);
+        setter(asset.uri);
+        console.log(`[Edit] 📎 ${label} selecionado:`, asset.uri);
       }
     } catch (error) {
       showAlert('Erro', `Não foi possível selecionar ${label}`);
@@ -301,11 +303,11 @@ export default function EditPatrimonyScreen({ route, navigation }) {
               const result = await ImagePicker.launchCameraAsync({
                 mediaTypes: ['images'],
                 quality: 0.8,
-                base64: true,
+                base64: false,   // ← CORRIGIDO
               });
               if (!result.canceled && result.assets && result.assets[0]) {
                 const asset = result.assets[0];
-                setter(asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri);
+                setter(asset.uri);
               }
             } catch (e) {
               showAlert('Erro', 'Não foi possível tirar a foto');
@@ -327,11 +329,11 @@ export default function EditPatrimonyScreen({ route, navigation }) {
               const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ['images'],
                 quality: 0.8,
-                base64: true,
+                base64: false,   // ← CORRIGIDO: uri nativo para upload mobile
               });
               if (!result.canceled && result.assets && result.assets[0]) {
                 const asset = result.assets[0];
-                setter(asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri);
+                setter(asset.uri);
               }
             } catch (e) {
               showAlert('Erro', 'Não foi possível abrir a galeria');
@@ -456,6 +458,7 @@ export default function EditPatrimonyScreen({ route, navigation }) {
         commitment_number: formData.commitment_number?.trim() || null,
         denf_se_number: formData.denf_se_number?.trim() || null,
         nf_issue_date: formData.nf_issue_date || null,
+        is_vehicle: formData.is_vehicle || false,
       };
 
       const url = `${API_BASE_URL}/api/patrimony/${patrimony.id}`;
@@ -486,73 +489,47 @@ export default function EditPatrimonyScreen({ route, navigation }) {
           await uploadImageToPatrimony(patrimonyId, image);
         }
 
-        // 2. DOCUMENTOS FISCAIS
-        if (invoiceFile || commitmentFile || denfFile) {
-          let fiscalDocId = null;
+        // 2. DOCUMENTOS FISCAIS — usando patrimonyId (o backend faz auto-insert se não existir)
+        const failures = [];
 
-          // Busca o fiscal_document ATUALIZADO do backend
+        // LOG: confirmar se os arquivos foram selecionados
+        console.log('[Edit] 📦 Arquivos selecionados:', {
+          image: image ? image.substring(0, 80) : null,
+          invoiceFile: invoiceFile ? invoiceFile.substring(0, 80) : null,
+          commitmentFile: commitmentFile ? commitmentFile.substring(0, 80) : null,
+          denfFile: denfFile ? denfFile.substring(0, 80) : null,
+        });
+
+        const safeUpload = async (label, fn) => {
           try {
-            const fullResp = await fetch(`${API_BASE_URL}/api/patrimony/${patrimonyId}`, {
-              headers: { 'Authorization': `Bearer ${token}` },
-            });
-            if (fullResp.ok) {
-              const full = await fullResp.json();
-              if (full.fiscal_documents && full.fiscal_documents.length > 0) {
-                fiscalDocId = full.fiscal_documents[0].id;
-                console.log('[Edit] 📋 fiscal_document existente encontrado:', fiscalDocId);
-              } else {
-                console.log('[Edit] 📋 Nenhum fiscal_document encontrado, vai criar novo');
-              }
-            }
+            console.log(`[Edit] ▶️ Upload: ${label}`);
+            const result = await fn();
+            console.log(`[Edit] ◀️ Resultado ${label}:`, result);
+            if (result === true) return true;
+            if (result && typeof result === 'object' && result.ok === true) return true;
+            return false;
           } catch (e) {
-            console.log('[Edit] ⚠️ Erro ao buscar fiscal_documents:', e);
+            console.error(`[Edit] 💥 EXCEÇÃO ${label}:`, e?.message || e);
+            return false;
           }
+        };
 
-          // Se não achou, cria novo
-          if (!fiscalDocId) {
-            console.log('[Edit] 📋 Criando novo fiscal_document...');
-            try {
-              const fiscalResp = await fetch(`${API_BASE_URL}/api/patrimony/${patrimonyId}/fiscal-document`, {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${token}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  invoice_number: formData.invoice_number.trim() || null,
-                  commitment_number: formData.commitment_number.trim() || null,
-                  denf_se_number: formData.denf_se_number.trim() || null,
-                  nf_issue_date: formData.nf_issue_date || null,
-                }),
-              });
-              console.log('[Edit] 📡 fiscal_document status:', fiscalResp.status);
-              if (fiscalResp.ok) {
-                const fiscalDoc = await fiscalResp.json();
-                fiscalDocId = fiscalDoc.id;
-                console.log('[Edit] ✅ fiscal_document criado:', fiscalDocId);
-              } else {
-                const errText = await fiscalResp.text();
-                console.log('[Edit] ❌ Erro fiscal_document:', errText);
-              }
-            } catch (e) {
-              console.log('[Edit] ❌ Exception fiscal_document:', e);
-            }
-          }
+        if (invoiceFile) {
+          const ok = await safeUpload('NF', () => uploadFiscalDocument(patrimonyId, invoiceFile, 'invoice'));
+          if (!ok) failures.push('NF');
+        }
+        if (commitmentFile) {
+          const ok = await safeUpload('Empenho', () => uploadFiscalDocument(patrimonyId, commitmentFile, 'commitment'));
+          if (!ok) failures.push('Empenho');
+        }
+        if (denfFile) {
+          const ok = await safeUpload('DENF/SE', () => uploadFiscalDocument(patrimonyId, denfFile, 'denf'));
+          if (!ok) failures.push('DENF/SE');
+        }
 
-          if (fiscalDocId) {
-            if (invoiceFile) {
-              console.log('[Edit] 📄 Enviando NF...');
-              await uploadFiscalDocument(fiscalDocId, invoiceFile, 'invoice');
-            }
-            if (commitmentFile) {
-              console.log('[Edit] 📑 Enviando Empenho...');
-              await uploadFiscalDocument(fiscalDocId, commitmentFile, 'commitment');
-            }
-            if (denfFile) {
-              console.log('[Edit] 📋 Enviando DENF/SE...');
-              await uploadFiscalDocument(fiscalDocId, denfFile, 'denf');
-            }
-          }
+        console.log('[Edit] 🏁 Uploads concluídos. Falhas:', failures);
+        if (failures.length > 0) {
+          showAlert('Aviso', `Dados salvos, mas falharam: ${failures.join(', ')}`);
         }
 
         // Mostrar o alerta (sem callback)
@@ -886,6 +863,17 @@ export default function EditPatrimonyScreen({ route, navigation }) {
           placeholder="Número DENF/SE"
           editable={!loading}
         />
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginVertical: 12, backgroundColor: 'white', borderRadius: 8, padding: 12, borderWidth: 2, borderColor: '#e5e7eb' }}>
+          <Text style={{ fontSize: 16, fontWeight: '600', color: '#374151' }}>🚗 É veículo?</Text>
+          <Switch
+            value={!!formData.is_vehicle}
+            onValueChange={(v) => handleInputChange('is_vehicle', v)}
+            disabled={loading}
+            trackColor={{ false: '#d1d5db', true: '#3b82f6' }}
+            thumbColor={formData.is_vehicle ? '#ffffff' : '#f4f3f4'}
+          />
+        </View>
 
         <DateInput
           label="Data de Emissão da NF"
